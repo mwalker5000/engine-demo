@@ -25,7 +25,7 @@ PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
 
 def run_agent_on_example(inputs: dict) -> dict:
     from agent.agent import invoke_agent
-    response = invoke_agent(question=inputs.get("question", ""))
+    response, _ = invoke_agent(question=inputs.get("question", ""))
     return {"output": response}
 
 
