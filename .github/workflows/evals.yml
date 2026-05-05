@@ -26,7 +26,7 @@ jobs:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
           LANGCHAIN_TRACING_V2: "true"
-          LANGSMITH_PROJECT: parrot-expert-demo
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
           LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
           DEMO_USER: ${{ secrets.DEMO_USER }}
         run: |
