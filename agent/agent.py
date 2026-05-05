@@ -1,3 +1,5 @@
+import uuid
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -25,28 +27,32 @@ def build_agent():
     return graph.compile()
 
 
-def _make_config(extra_metadata: dict = None) -> RunnableConfig:
+def _make_config(extra_metadata: dict = None, run_id: uuid.UUID = None) -> RunnableConfig:
     metadata = {"demo": "true", "demo_type": "parrot-expert"}
     if extra_metadata:
         metadata.update(extra_metadata)
-    return RunnableConfig(
+    config = RunnableConfig(
         metadata=metadata,
         tags=["engine-demo", "parrot-agent"],
         run_name="parrot-demo",
     )
+    if run_id is not None:
+        config["run_id"] = run_id
+    return config
 
 
-def invoke_agent(question: str, extra_metadata: dict = None) -> str:
-    """Invoke the agent and return the full response string."""
+def invoke_agent(question: str, extra_metadata: dict = None) -> tuple[str, uuid.UUID]:
+    """Invoke the agent. Returns (response, run_id) so callers can log feedback."""
     agent = build_agent()
+    run_id = uuid.uuid4()
     result = agent.invoke(
         {"messages": [{"role": "user", "content": question}]},
-        _make_config(extra_metadata),
+        _make_config(extra_metadata, run_id=run_id),
     )
     for msg in reversed(result["messages"]):
         if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content:
-            return msg.content
-    return ""
+            return msg.content, run_id
+    return "", run_id
 
 
 def stream_agent(question: str, extra_metadata: dict = None):
