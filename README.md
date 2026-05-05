@@ -68,7 +68,7 @@ streamlit run app.py
 
 ### During the demo
 
-1. Show PollyGraph UI — ask buggy questions (avocado, golden retriever care)
+1. Show PocketPolly UI — ask buggy questions (avocado, golden retriever care)
 2. Show traces in LangSmith — Engine analyzes them
 3. Engine identifies the system prompt as root cause
 4. Engine opens a PR on your fork
@@ -89,7 +89,7 @@ streamlit run app.py
 | `python -m scripts.run_evals --skip-dataset` | Re-runs evals against existing dataset (used in CI) |
 | `python -m scripts.run_evals --threshold 0.8` | Exits with code 1 if scores < 0.8 (used in CI) |
 | `python -m scripts.cleanup` | ⚠️ To be implemented — see Cleanup section |
-| `streamlit run app.py` | Start the PollyGraph chat UI |
+| `streamlit run app.py` | Start the PocketPolly chat UI |
 
 ## Evaluators
 
@@ -130,7 +130,7 @@ scripts/
 .github/workflows/
 └── evals.yml         # CI/CD: runs evals on every PR
 
-app.py                # PollyGraph chat UI (Streamlit)
+app.py                # PocketPolly chat UI (Streamlit)
 ```
 
 ## Cleanup
