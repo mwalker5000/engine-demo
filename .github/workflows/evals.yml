@@ -25,6 +25,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
+          LANGCHAIN_TRACING_V2: "true"
           LANGSMITH_PROJECT: parrot-expert-demo
+          LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
+          DEMO_USER: ${{ secrets.DEMO_USER }}
         run: |
           python -m scripts.run_evals --skip-dataset --threshold 0.8
