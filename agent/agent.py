@@ -55,12 +55,14 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> tuple[str, uuid.
     return "", run_id
 
 
-def stream_agent(question: str, extra_metadata: dict = None):
+def stream_agent(question: str, extra_metadata: dict = None, run_id: uuid.UUID = None):
     """Stream the agent response token by token. Yields str chunks."""
+    if run_id is None:
+        run_id = uuid.uuid4()
     agent = build_agent()
     for chunk, _ in agent.stream(
         {"messages": [{"role": "user", "content": question}]},
-        _make_config(extra_metadata),
+        _make_config(extra_metadata, run_id=run_id),
         stream_mode="messages",
     ):
         if hasattr(chunk, "content") and isinstance(chunk.content, str):
