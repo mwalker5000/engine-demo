@@ -1,4 +1,4 @@
-"""PollyGraph — simple chat UI."""
+"""PocketPolly — simple chat UI."""
 
 import base64
 from pathlib import Path
@@ -12,7 +12,7 @@ def _logo_b64() -> str:
     return base64.b64encode(path.read_bytes()).decode()
 
 st.set_page_config(
-    page_title="PollyGraph",
+    page_title="PocketPolly",
     page_icon="🦜",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -172,7 +172,7 @@ if not st.session_state.messages:
         <line x1="35" y1="64" x2="32" y2="67" stroke="#5ab4d6" stroke-width="1.5" stroke-linecap="round"/>
         <line x1="35" y1="64" x2="37" y2="67" stroke="#5ab4d6" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
-      <div style="font-size:22px; font-weight:700; color:#ffffff; margin-top:16px; letter-spacing:-0.3px;">PollyGraph</div>
+      <div style="font-size:22px; font-weight:700; color:#ffffff; margin-top:16px; letter-spacing:-0.3px;">PocketPolly</div>
       <div style="font-size:13px; color:#52525b; margin-top:6px;">Parrot expert agent built on LangGraph</div>
     </div>
     """, unsafe_allow_html=True)
@@ -210,7 +210,7 @@ for msg in st.session_state.messages:
         """, unsafe_allow_html=True)
 
 # ── Input ─────────────────────────────────────────────────────────────────
-user_input = st.chat_input("Message PollyGraph...")
+user_input = st.chat_input("Message PocketPolly...")
 
 if "pending" in st.session_state:
     user_input = st.session_state.pop("pending")
