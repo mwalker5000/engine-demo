@@ -52,7 +52,7 @@ LANGCHAIN_TRACING_V2=true
 DEMO_USER=your-name
 ```
 
-> **Important:** Use a unique `LANGSMITH_PROJECT` name per person (e.g. `parrot-expert-demo-morgan`). Multiple demo-ers sharing the same project name will mix traces and online evaluators. The project is created automatically on first use.
+> Use a unique `LANGSMITH_PROJECT` name per person (e.g. `parrot-expert-demo-morgan`). Multiple demo-ers sharing the same project name will mix traces and online evaluators. The project is created automatically on first use.
 
 `DEMO_USER` additionally scopes your dataset and experiment names:
 - Dataset: `parrot-expert-demo-dataset-morgan`
