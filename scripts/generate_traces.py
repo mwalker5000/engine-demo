@@ -1,7 +1,7 @@
-"""Generate demo traces to populate LangSmith with buggy agent behavior.
+"""Generate demo traces to populate LangSmith.
 
 Generates two types of traces:
-  1. Single-turn traces — individual questions across all bug categories
+  1. Single-turn traces — individual questions
   2. Multi-turn threads — realistic conversations grouped by thread_id
 
 Usage:

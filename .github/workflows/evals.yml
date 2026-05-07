@@ -1,17 +1,8 @@
 name: Offline Evals
 
-# Disabled — trigger manually from the Actions tab if needed.
-# To re-enable automatic runs on every PR to main:
-#   1. Change the trigger to:
-#        on:
-#          pull_request:
-#            branches: [main]
-#   2. Add these secrets to your repo (Settings → Secrets → Actions):
-#        ANTHROPIC_API_KEY, LANGSMITH_API_KEY, LANGSMITH_PROJECT,
-#        LANGSMITH_WORKSPACE_ID, DEMO_USER
-#   Note: run `python -m scripts.setup` locally first so the dataset exists.
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   evals:

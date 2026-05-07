@@ -2,8 +2,8 @@
 
 Run this once after cloning and configuring .env. It:
   1. Creates (or updates) the LangSmith evaluation dataset
-  2. Runs an initial experiment through the dataset with the buggy agent
-     to establish "before" scores in LangSmith
+  2. Runs an initial experiment through the dataset to establish "before"
+     scores in LangSmith
   3. Creates 5 online evaluators in the LangSmith Evaluators UI at 100%
      sampling rate so every future trace is automatically scored
 
@@ -132,7 +132,7 @@ def _make_offline_evaluator(ev: dict):
 
 
 def run_initial_experiment() -> None:
-    """Run the buggy agent against the dataset to establish 'before' scores."""
+    """Run the agent against the dataset to establish 'before' scores."""
     from langsmith import evaluate
     from agent.agent import invoke_agent
 
@@ -160,7 +160,7 @@ def run_initial_experiment() -> None:
             if eval_result.key in scores:
                 scores[eval_result.key].append(eval_result.score)
 
-    print("\n  Experiment scores (buggy agent — expect low):")
+    print("\n  Experiment scores (before):")
     for key, values in scores.items():
         avg = sum(values) / len(values) if values else 0.0
         print(f"    {key}: {avg:.2f} ({len(values)} examples)")

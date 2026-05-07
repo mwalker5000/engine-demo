@@ -64,7 +64,7 @@ python -m scripts.setup
 ```
 
 This does three things in one command:
-1. **Creates the dataset** `parrot-expert-demo-dataset-<your-name>` with hand-crafted and LLM-generated test cases
+1. **Creates the dataset** `parrot-expert-demo-dataset-<your-name>` with 10 curated test cases
 2. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith (this also creates the LangSmith project)
 3. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`
 
@@ -75,7 +75,7 @@ Only needs to be run once.
 python -m scripts.generate_traces
 ```
 
-Runs 13 hardcoded queries through the buggy agent to populate LangSmith with more trace variety beyond the dataset examples.
+Runs 13 single-turn queries and 3 multi-turn threaded conversations through the buggy agent to populate LangSmith with trace and thread variety beyond the dataset examples.
 
 **6. Add GitHub secrets** (for CI/CD)
 
@@ -115,7 +115,7 @@ streamlit run app.py
 | Script | What it does |
 |--------|-------------|
 | `python -m scripts.setup` | One-shot setup: creates dataset, runs "before" experiment, creates 5 online evaluators |
-| `python -m scripts.generate_traces` | Runs 13 hardcoded queries through the buggy agent to add trace variety |
+| `python -m scripts.generate_traces` | Runs 13 single-turn queries + 3 multi-turn threads through the buggy agent |
 | `python -m scripts.run_evals` | Runs offline evals against the dataset and prints scores |
 | `python -m scripts.run_evals --skip-dataset` | Re-runs evals against existing dataset (used in CI) |
 | `python -m scripts.run_evals --threshold 0.8` | Exits with code 1 if scores < 0.8 (used in CI) |
@@ -142,25 +142,17 @@ The evaluators use `{{output}}` (mustache format) mapped to `outputs["output"]` 
 
 ## CI/CD
 
-`.github/workflows/evals.yml` is currently **disabled** (manual trigger only). To enable automatic eval runs on every PR to `main`:
+`.github/workflows/evals.yml` runs automatically on every PR to `main`.
 
-1. Change the trigger in `evals.yml` to:
-```yaml
-on:
-  pull_request:
-    branches: [main]
-```
+Add these secrets to your repo (Settings → Secrets → Actions):
+- `ANTHROPIC_API_KEY`
+- `LANGSMITH_API_KEY`
+- `LANGSMITH_PROJECT`
+- `LANGSMITH_WORKSPACE_ID`
+- `DEMO_USER`
 
-2. Add these secrets to your fork (Settings → Secrets → Actions):
-   - `ANTHROPIC_API_KEY`
-   - `LANGSMITH_API_KEY`
-   - `LANGSMITH_PROJECT`
-   - `LANGSMITH_WORKSPACE_ID`
-   - `DEMO_USER`
+Run `python -m scripts.setup` locally first so the dataset exists for CI to run against. `DEMO_USER` and `LANGSMITH_PROJECT` must match what you used locally — that's how CI finds the right dataset.
 
-3. Run `python -m scripts.setup` locally first so the dataset exists for CI to run against.
-
-When enabled, the flow is:
 ```
 PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.8
                                           ↓
@@ -168,7 +160,7 @@ PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.8
                                scores ≥ 0.8 → ✅ mergeable
 ```
 
-CI runs against the PR branch code — so Engine's fix produces high scores, creating the "after" experiment in LangSmith automatically.
+CI runs against the PR branch code — so Engine's fix produces high scores, creating the "after" experiment in LangSmith automatically. Because `--skip-dataset` fetches the existing dataset from LangSmith by name, any examples Engine adds to the dataset are included in the eval run automatically.
 
 ## Repo structure
 
@@ -179,8 +171,8 @@ agent/
 └── agent.py          # LangGraph ReAct agent (Bug 4 — max_tokens too low)
 
 evals/
-├── dataset.py        # creates per-user LangSmith dataset (hand-crafted + LLM-generated)
-└── evaluators.py     # food_safety + scope_adherence offline evaluators (used in CI)
+├── dataset.py        # creates per-user LangSmith dataset (10 curated examples)
+└── evaluators.py     # 5 LLM-as-judge offline evaluators (used in CI)
 
 scripts/
 ├── setup.py          # one-shot setup: dataset + before experiment + online evaluators
@@ -188,7 +180,7 @@ scripts/
 └── run_evals.py          # offline evals + CI threshold check
 
 .github/workflows/
-└── evals.yml         # CI/CD: runs evals on every PR (manual trigger only — see CI/CD section)
+└── evals.yml         # CI/CD: runs evals on every PR to main
 
 app.py                # PocketPolly chat UI (Streamlit)
 ```
