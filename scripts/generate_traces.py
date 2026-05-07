@@ -37,7 +37,6 @@ QUERIES = [
 
 def main():
     from agent.agent import invoke_agent
-    from evals.online_evaluators import score_and_log
 
     print(f"Generating {len(QUERIES)} demo traces...\n")
 
@@ -46,15 +45,12 @@ def main():
         print(f"[{i+1}/{len(QUERIES)}] {question[:70]}...")
 
         try:
-            response, run_id = invoke_agent(
+            response = invoke_agent(
                 question=question,
                 extra_metadata={"category": query["category"], "subcategory": query["subcategory"]},
             )
             preview = response[:120].replace("\n", " ")
-            print(f"  → {preview}{'...' if len(response) > 120 else ''}")
-
-            scores = score_and_log(run_id, response)
-            print(f"  scores: {scores}\n")
+            print(f"  → {preview}{'...' if len(response) > 120 else ''}\n")
         except Exception as e:
             print(f"  ERROR: {e}\n")
 

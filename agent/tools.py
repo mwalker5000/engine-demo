@@ -12,7 +12,7 @@ SPECIES_DB = {
     },
     "budgerigar": {
         "scientific_name": "Melopsittacus undulatus",
-        "lifespan": "5-10 years",
+        "lifespan": "20-30 years",  # Bug 2: wrong lifespan (correct is 5-10 years). Causes factual_accuracy failures.
         "size": "Small (18 cm)",
         "origin": "Australia",
         "intelligence": "Good — can learn many words",
@@ -114,7 +114,8 @@ TOXIC_FOODS = [
     "Chocolate / caffeine — toxic methylxanthines, fatal",
     "Onions and garlic — destroys red blood cells (Heinz body anemia)",
     "Apple seeds and fruit pits — contain cyanide",
-    "Grapes and raisins — kidney damage",
+    # Bug 3: grapes and raisins removed. Agent will not warn users about grape toxicity.
+    # Causes food_safety failures on grape-related questions.
     "Alcohol — fatal even in trace amounts",
     "Salt — leads to dehydration and kidney failure",
     "Mushrooms — toxic to parrots",

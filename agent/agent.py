@@ -1,17 +1,18 @@
-import uuid
-
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.prebuilt import ToolNode, tools_condition
+from langsmith import traceable
 
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOLS
 
 
 def build_agent():
-    llm = ChatAnthropic(model="claude-haiku-4-5-20251001").bind_tools(TOOLS)
+    # Bug 4: max_tokens=300 truncates responses on longer questions.
+    # Causes response_completeness failures on complex care or diet questions.
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001", max_tokens=300).bind_tools(TOOLS)
 
     def call_model(state: MessagesState, config: RunnableConfig):
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
@@ -27,43 +28,40 @@ def build_agent():
     return graph.compile()
 
 
-def _make_config(extra_metadata: dict = None, run_id: uuid.UUID = None) -> RunnableConfig:
+def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     metadata = {"demo": "true", "demo_type": "parrot-expert"}
     if extra_metadata:
         metadata.update(extra_metadata)
-    config = RunnableConfig(
+    return RunnableConfig(
         metadata=metadata,
         tags=["engine-demo", "parrot-agent"],
         run_name="parrot-demo",
     )
-    if run_id is not None:
-        config["run_id"] = run_id
-    return config
 
 
-def invoke_agent(question: str, extra_metadata: dict = None) -> tuple[str, uuid.UUID]:
-    """Invoke the agent. Returns (response, run_id) so callers can log feedback."""
+@traceable(name="parrot-demo", run_type="chain", tags=["engine-demo", "parrot-agent"])
+def invoke_agent(question: str, extra_metadata: dict = None) -> str:
+    """Invoke the agent and return the full response string.
+
+    @traceable gives the root LangSmith trace outputs: {"output": "..."},
+    which online evaluators can reference via variable_mapping {"output": "output"}.
+    """
     agent = build_agent()
-    run_id = uuid.uuid4()
     result = agent.invoke(
         {"messages": [{"role": "user", "content": question}]},
-        _make_config(extra_metadata, run_id=run_id),
+        _make_config(extra_metadata),
     )
     for msg in reversed(result["messages"]):
         if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content:
-            return msg.content, run_id
-    return "", run_id
+            return msg.content
+    return ""
 
 
-def stream_agent(question: str, extra_metadata: dict = None, run_id: uuid.UUID = None):
-    """Stream the agent response token by token. Yields str chunks."""
-    if run_id is None:
-        run_id = uuid.uuid4()
-    agent = build_agent()
-    for chunk, _ in agent.stream(
-        {"messages": [{"role": "user", "content": question}]},
-        _make_config(extra_metadata, run_id=run_id),
-        stream_mode="messages",
-    ):
-        if hasattr(chunk, "content") and isinstance(chunk.content, str):
-            yield chunk.content
+def stream_agent(question: str, extra_metadata: dict = None):
+    """Stream the agent response token by token. Yields str chunks.
+
+    Calls invoke_agent internally so every trace — including UI traces — has
+    outputs: {"output": "..."} for online evaluators to score.
+    """
+    response = invoke_agent(question, extra_metadata)
+    yield from response

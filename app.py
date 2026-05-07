@@ -1,8 +1,6 @@
 """PocketPolly — simple chat UI."""
 
 import base64
-import threading
-import uuid
 from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
@@ -237,19 +235,15 @@ if user_input:
 
     placeholder = st.empty()
     response = ""
-    run_id = uuid.uuid4()
 
     try:
         from agent.agent import stream_agent
-        from evals.online_evaluators import score_and_log
-        for chunk in stream_agent(question=user_input, run_id=run_id):
+        for chunk in stream_agent(question=user_input):
             response += chunk
             placeholder.markdown(
                 f'<div style="color:#e4e4e7;font-size:14px;line-height:1.7;">{response}</div>',
                 unsafe_allow_html=True,
             )
-        # Score the completed response in the background so UI isn't blocked
-        threading.Thread(target=score_and_log, args=(run_id, response), daemon=True).start()
     except Exception as e:
         response = f"Error: {e}"
         placeholder.markdown(response)
