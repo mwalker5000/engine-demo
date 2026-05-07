@@ -1,20 +1,21 @@
-"""LangSmith dataset management for the parrot expert demo.
-
-Includes hand-crafted test cases plus LLM-generated custom examples
-(Christine's request: show off custom-generated offline examples).
-"""
+"""LangSmith dataset management for the parrot expert demo."""
 
 import os
-import time
 from langsmith import Client
 
-import os
 _demo_user = os.getenv("DEMO_USER", "").strip()
 DATASET_NAME = f"parrot-expert-demo-dataset-{_demo_user}" if _demo_user else "parrot-expert-demo-dataset"
 
-# Hand-crafted test cases
-HAND_CRAFTED_EXAMPLES = [
-    # --- Food safety: toxic food questions (buggy agent fails these) ---
+EXAMPLES = [
+    # --- Food safety: raisins/grapes ---
+    {
+        "input": {"question": "Can I give my bird a few raisins as a treat?"},
+        "output": {
+            "expected": "Grapes and raisins are toxic to parrots and can cause kidney damage. They should never be fed to your bird."
+        },
+        "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
+    },
+    # --- Food safety: other toxic foods (agent passes these even before fix) ---
     {
         "input": {"question": "Can parrots eat avocado? My bird loves it."},
         "output": {
@@ -30,31 +31,24 @@ HAND_CRAFTED_EXAMPLES = [
         "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
     },
     {
-        "input": {"question": "My parrot seems to like onions. Can I give them cooked onions?"},
-        "output": {
-            "expected": "Onions are toxic to parrots regardless of preparation. They destroy red blood cells and should never be fed."
-        },
-        "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
-    },
-    {
-        "input": {"question": "Can I give my bird a few raisins as a treat?"},
-        "output": {
-            "expected": "Grapes and raisins are toxic to parrots and can cause kidney damage. They should be avoided."
-        },
-        "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
-    },
-    {
         "input": {"question": "What about apple slices with the seeds? Is that okay?"},
         "output": {
             "expected": "Apple flesh is fine but apple seeds contain cyanide and are toxic to parrots. Always remove seeds before feeding."
         },
         "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
     },
-    # --- Scope adherence: non-parrot questions (buggy agent answers these) ---
     {
-        "input": {"question": "How do I care for my golden retriever? He's been scratching a lot."},
+        "input": {"question": "My parrot seems to like onions. Can I give them cooked onions?"},
         "output": {
-            "expected": "I specialize exclusively in parrot care and can't help with dogs. Please consult a veterinarian for your golden retriever."
+            "expected": "Onions are toxic to parrots regardless of preparation. They destroy red blood cells and should never be fed."
+        },
+        "metadata": {"category": "food_safety", "subcategory": "toxic_food"},
+    },
+    # --- Scope adherence: non-parrot questions (agent answers these before fix) ---
+    {
+        "input": {"question": "I just got a Golden Retriever puppy and I'm not sure how often I should be bathing him or what kind of shampoo would be best for his coat?"},
+        "output": {
+            "expected": "I specialize exclusively in parrot care and can't help with dogs. Please consult a veterinarian or dog grooming specialist for your Golden Retriever."
         },
         "metadata": {"category": "scope", "subcategory": "other_animal"},
     },
@@ -66,13 +60,21 @@ HAND_CRAFTED_EXAMPLES = [
         "metadata": {"category": "scope", "subcategory": "other_animal"},
     },
     {
-        "input": {"question": "What's the best food for a hamster?"},
+        "input": {"question": "I just got a bearded dragon and I'm not sure if I should be feeding it live crickets or roaches, and how often should I be doing this?"},
         "output": {
-            "expected": "I'm a parrot specialist and don't have expertise in hamster care. I'd recommend consulting a small animal vet."
+            "expected": "I specialize in parrot care and can't advise on bearded dragons. Please consult a reptile specialist or exotic vet for feeding guidance."
         },
         "metadata": {"category": "scope", "subcategory": "other_animal"},
     },
-    # --- Normal parrot questions (both versions should handle these) ---
+    # --- Health/care: normal parrot question (tests response completeness) ---
+    {
+        "input": {"question": "My African Grey has been kind of quiet lately and I noticed he's not eating his pellets like usual - what are some signs I should be looking out for that might mean he's getting sick?"},
+        "output": {
+            "expected": "Decreased appetite and quietness are important warning signs in African Greys. Watch for fluffed feathers, tail bobbing while breathing, discharge from eyes or nostrils, changes in droppings, or lethargy — these require an immediate avian vet visit as birds hide illness until it's serious."
+        },
+        "metadata": {"category": "care", "subcategory": "health"},
+    },
+    # --- Factual: baseline question (both before and after should pass) ---
     {
         "input": {"question": "How long do African Grey parrots live?"},
         "output": {
@@ -80,118 +82,17 @@ HAND_CRAFTED_EXAMPLES = [
         },
         "metadata": {"category": "species_info", "subcategory": "lifespan"},
     },
-    {
-        "input": {"question": "What vegetables can I feed my parrot?"},
-        "output": {
-            "expected": "Safe vegetables include leafy greens, carrots, bell peppers, broccoli, corn, and peas."
-        },
-        "metadata": {"category": "food_safety", "subcategory": "safe_food"},
-    },
-    {
-        "input": {"question": "How big of a cage does a macaw need?"},
-        "output": {
-            "expected": "Macaws need a very large cage, at least 36x48x60 inches, with 1-1.5 inch bar spacing."
-        },
-        "metadata": {"category": "care", "subcategory": "housing"},
-    },
-]
-
-# Seed prompts for LLM-generated examples
-GENERATION_SEED_PROMPTS = [
-    ("food_safety", "toxic_food", "Ask whether a specific toxic food is safe for parrots"),
-    ("food_safety", "toxic_food", "Ask about feeding parrots a food that contains caffeine or chocolate"),
-    ("food_safety", "safe_food", "Ask about a specific vegetable or fruit that is safe for parrots"),
-    ("scope", "other_animal", "Ask a question about caring for a specific dog breed"),
-    ("scope", "other_animal", "Ask a question about fish or reptile care"),
-    ("species_info", "behavior", "Ask about the personality or behavior of a specific parrot species"),
-    ("care", "enrichment", "Ask about keeping a parrot entertained or stimulated"),
-    ("care", "health", "Ask about signs that a parrot might be sick"),
 ]
 
 
-def generate_llm_examples(n: int = 8) -> list[dict]:
-    """Generate custom test examples using Claude.
-
-    This showcases LangSmith Engine's custom dataset generation capability.
-    Each generated example is diverse and targets specific failure modes.
-    """
-    from anthropic import Anthropic
-
-    client = Anthropic()
-    examples = []
-
-    print(f"Generating {n} custom examples with Claude...")
-
-    for i, (category, subcategory, seed) in enumerate(GENERATION_SEED_PROMPTS[:n]):
-        prompt = f"""Generate a realistic user question for testing a parrot expert chatbot.
-
-Seed: {seed}
-Category: {category}
-Subcategory: {subcategory}
-
-Requirements:
-- Write it as a real user would ask (conversational, possibly with context about their pet)
-- Keep it 1-2 sentences
-- Make it specific enough to test the model's knowledge
-
-Respond with ONLY the question text, no quotes or explanation."""
-
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=100,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        question = response.content[0].text.strip()
-
-        # Generate expected answer
-        answer_prompt = f"""For a parrot-only specialist chatbot, what is the ideal response to this question?
-
-Question: {question}
-Category: {category} / {subcategory}
-
-Rules:
-- If it's about a toxic food: clearly state it's toxic and why
-- If it's about another animal: politely decline and redirect to parrots
-- If it's a valid parrot question: give accurate, helpful advice
-- Keep it 1-3 sentences
-
-Respond with ONLY the expected answer."""
-
-        answer_response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=150,
-            messages=[{"role": "user", "content": answer_prompt}],
-        )
-        expected = answer_response.content[0].text.strip()
-
-        examples.append({
-            "input": {"question": question},
-            "output": {"expected": expected},
-            "metadata": {
-                "category": category,
-                "subcategory": subcategory,
-                "generated": True,
-            },
-        })
-        print(f"  [{i+1}/{n}] Generated: {question[:60]}...")
-        time.sleep(1)
-
-    return examples
-
-
-def create_or_update_dataset(include_generated: bool = True, n_generated: int = 8) -> str:
-    """Create or update the LangSmith evaluation dataset.
-
-    Returns the dataset ID.
-    """
+def create_or_update_dataset() -> str:
+    """Create or update the LangSmith evaluation dataset. Returns the dataset ID."""
     ls_client = Client()
 
-    # Check if dataset already exists
     datasets = list(ls_client.list_datasets(dataset_name=DATASET_NAME))
     if datasets:
         dataset = datasets[0]
         print(f"Dataset '{DATASET_NAME}' already exists (ID: {dataset.id}). Updating...")
-        # Delete existing examples and re-upload for clean state
         existing = list(ls_client.list_examples(dataset_id=dataset.id))
         if existing:
             ls_client.delete_examples([e.id for e in existing])
@@ -199,24 +100,17 @@ def create_or_update_dataset(include_generated: bool = True, n_generated: int = 
     else:
         dataset = ls_client.create_dataset(
             dataset_name=DATASET_NAME,
-            description="Parrot expert chatbot evaluation dataset — tests food safety and scope adherence. Includes hand-crafted and LLM-generated examples.",
+            description="Parrot expert chatbot evaluation dataset — tests food safety, scope adherence, response completeness, and factual accuracy.",
         )
         print(f"Created dataset '{DATASET_NAME}' (ID: {dataset.id})")
 
-    all_examples = list(HAND_CRAFTED_EXAMPLES)
-
-    if include_generated:
-        generated = generate_llm_examples(n_generated)
-        all_examples.extend(generated)
-
-    # Upload examples
     ls_client.create_examples(
         dataset_id=dataset.id,
-        inputs=[e["input"] for e in all_examples],
-        outputs=[e["output"] for e in all_examples],
-        metadata=[e.get("metadata", {}) for e in all_examples],
+        inputs=[e["input"] for e in EXAMPLES],
+        outputs=[e["output"] for e in EXAMPLES],
+        metadata=[e.get("metadata", {}) for e in EXAMPLES],
     )
-    print(f"Uploaded {len(all_examples)} examples ({len(HAND_CRAFTED_EXAMPLES)} hand-crafted + {len(all_examples) - len(HAND_CRAFTED_EXAMPLES)} generated).")
+    print(f"Uploaded {len(EXAMPLES)} examples.")
 
     return str(dataset.id)
 
