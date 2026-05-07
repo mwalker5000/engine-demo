@@ -1,16 +1,15 @@
 """Generate demo traces to populate LangSmith with buggy agent behavior.
 
-Run this before the Engine demo. The traces will show the two bugs:
-  1. Toxic food hallucination (agent recommends fatal foods)
-  2. Out-of-scope answers (agent answers questions about other animals)
-
-LangSmith Engine will then identify these issues and propose a fix.
+Generates two types of traces:
+  1. Single-turn traces — individual questions across all bug categories
+  2. Multi-turn threads — realistic conversations grouped by thread_id
 
 Usage:
     python -m scripts.generate_traces
 """
 
 import time
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -34,29 +33,73 @@ QUERIES = [
     {"question": "Tell me about budgerigar personality traits.", "category": "species_info", "subcategory": "personality"},
 ]
 
+THREADS = [
+    {
+        "name": "New owner asking about diet",
+        "turns": [
+            {"question": "I just got my first parrot, a green-winged macaw. What should I feed her?", "category": "food_safety", "subcategory": "safe_food"},
+            {"question": "Can I give her raisins as a treat? She loves dried fruit.", "category": "food_safety", "subcategory": "toxic_food"},
+            {"question": "What about avocado? I eat a lot of it and she seems interested.", "category": "food_safety", "subcategory": "toxic_food"},
+        ],
+    },
+    {
+        "name": "Concerned owner about sick bird",
+        "turns": [
+            {"question": "My African Grey has been really quiet lately and not eating much.", "category": "care", "subcategory": "health"},
+            {"question": "His droppings also look different — more watery than usual. Is that serious?", "category": "care", "subcategory": "health"},
+            {"question": "Should I take him to a regular vet or does it need to be an avian specialist?", "category": "care", "subcategory": "health"},
+        ],
+    },
+    {
+        "name": "Mixed household with out-of-scope drift",
+        "turns": [
+            {"question": "How long do parrots live compared to dogs?", "category": "species_info", "subcategory": "lifespan"},
+            {"question": "I have both a parrot and a cat — any tips for keeping them safe around each other?", "category": "scope", "subcategory": "other_animal"},
+            {"question": "How do I introduce my parrot to my new golden retriever puppy?", "category": "scope", "subcategory": "other_animal"},
+        ],
+    },
+]
+
 
 def main():
     from agent.agent import invoke_agent
 
-    print(f"Generating {len(QUERIES)} demo traces...\n")
-
+    # --- Single-turn traces ---
+    print(f"Generating {len(QUERIES)} single-turn traces...\n")
     for i, query in enumerate(QUERIES):
         question = query["question"]
         print(f"[{i+1}/{len(QUERIES)}] {question[:70]}...")
-
         try:
             response = invoke_agent(
                 question=question,
                 extra_metadata={"category": query["category"], "subcategory": query["subcategory"]},
             )
-            preview = response[:120].replace("\n", " ")
-            print(f"  → {preview}{'...' if len(response) > 120 else ''}\n")
+            print(f"  → {response[:100].replace(chr(10), ' ')}{'...' if len(response) > 100 else ''}\n")
         except Exception as e:
             print(f"  ERROR: {e}\n")
-
         time.sleep(0.5)
 
-    print("Done. View traces in LangSmith — filter by tag 'engine-demo'.")
+    # --- Multi-turn threads ---
+    print(f"\nGenerating {len(THREADS)} multi-turn threads...\n")
+    for thread in THREADS:
+        thread_id = str(uuid.uuid4())
+        print(f"Thread: {thread['name']} (id: {thread_id[:8]}...)")
+        for j, turn in enumerate(thread["turns"]):
+            question = turn["question"]
+            print(f"  Turn {j+1}: {question[:65]}...")
+            try:
+                response = invoke_agent(
+                    question=question,
+                    extra_metadata={"category": turn["category"], "subcategory": turn["subcategory"]},
+                    langsmith_extra={"metadata": {"thread_id": thread_id}},
+                )
+                print(f"    → {response[:80].replace(chr(10), ' ')}{'...' if len(response) > 80 else ''}")
+            except Exception as e:
+                print(f"    ERROR: {e}")
+            time.sleep(0.5)
+        print()
+
+    print("Done. View traces in LangSmith — filter by tag 'engine-demo'. Threads appear in the Threads tab.")
 
 
 if __name__ == "__main__":
