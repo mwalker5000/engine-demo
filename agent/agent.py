@@ -57,11 +57,15 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> str:
     return ""
 
 
-def stream_agent(question: str, extra_metadata: dict = None):
+def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = None):
     """Stream the agent response token by token. Yields str chunks.
 
     Calls invoke_agent internally so every trace — including UI traces — has
     outputs: {"output": "..."} for online evaluators to score.
+    thread_id groups conversation turns under one thread in LangSmith.
     """
-    response = invoke_agent(question, extra_metadata)
+    kwargs = {}
+    if thread_id:
+        kwargs["langsmith_extra"] = {"metadata": {"thread_id": thread_id}}
+    response = invoke_agent(question, extra_metadata, **kwargs)
     yield from response

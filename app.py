@@ -146,8 +146,11 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Session state ─────────────────────────────────────────────────────────
+import uuid
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = str(uuid.uuid4())
 
 # ── Empty state ───────────────────────────────────────────────────────────
 if not st.session_state.messages:
@@ -238,7 +241,7 @@ if user_input:
 
     try:
         from agent.agent import stream_agent
-        for chunk in stream_agent(question=user_input):
+        for chunk in stream_agent(question=user_input, thread_id=st.session_state.thread_id):
             response += chunk
             placeholder.markdown(
                 f'<div style="color:#e4e4e7;font-size:14px;line-height:1.7;">{response}</div>',
