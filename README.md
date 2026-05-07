@@ -46,13 +46,15 @@ Edit `.env`:
 ```
 ANTHROPIC_API_KEY=your-key
 LANGSMITH_API_KEY=your-demo-workspace-api-key
-LANGSMITH_PROJECT=parrot-expert-demo
+LANGSMITH_PROJECT=parrot-expert-demo-yourname
 LANGSMITH_WORKSPACE_ID=your-demo-workspace-id
 LANGCHAIN_TRACING_V2=true
 DEMO_USER=your-name
 ```
 
-`DEMO_USER` scopes your dataset and experiments so multiple demo-ers in the same workspace don't collide:
+> **Important:** Use a unique `LANGSMITH_PROJECT` name per person (e.g. `parrot-expert-demo-morgan`). Multiple demo-ers sharing the same project name will mix traces and online evaluators. The project is created automatically on first use.
+
+`DEMO_USER` additionally scopes your dataset and experiment names:
 - Dataset: `parrot-expert-demo-dataset-morgan`
 - Experiments: `parrot-demo-morgan-<timestamp>`
 
