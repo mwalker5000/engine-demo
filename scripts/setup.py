@@ -98,7 +98,7 @@ def setup_dataset() -> str:
     """Create or update the evaluation dataset. Returns the dataset name."""
     from evals.dataset import create_or_update_dataset
     print(f"\n[1/3] Setting up dataset '{DATASET_NAME}'...")
-    create_or_update_dataset(include_generated=True, n_generated=8)
+    create_or_update_dataset()
     return DATASET_NAME
 
 
