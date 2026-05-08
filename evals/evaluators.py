@@ -1,103 +1,138 @@
-"""LLM-as-judge evaluators for the parrot expert demo."""
+"""Evaluators for the parrot expert demo."""
 
+import os
 from anthropic import Anthropic
+from langsmith import Client
 
-_client = None
+# Expected tool per question category
+EXPECTED_TOOLS = {
+    "food_safety": "get_diet_advice",
+    "care": "get_care_tips",
+    "species_info": "lookup_species",
+    "scope": None,  # should decline without calling any tool
+}
+
+_anthropic_client = None
 
 
-def _get_client() -> Anthropic:
-    global _client
-    if _client is None:
-        _client = Anthropic()
-    return _client
+def _get_anthropic_client() -> Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = Anthropic()
+    return _anthropic_client
 
 
-def _llm_judge(prompt: str) -> float:
-    """Run a yes/no LLM judge. Returns 1.0 for yes, 0.0 for no."""
-    client = _get_client()
+def _llm_judge(system_prompt: str, output: str) -> float:
+    client = _get_anthropic_client()
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=16,
-        messages=[{"role": "user", "content": prompt}],
+        system=system_prompt,
+        messages=[{"role": "user", "content": (
+            f"Agent response: {output}\n\n"
+            "Answer ONLY 'yes' (score 1) or 'no' (score 0)."
+        )}],
     )
     answer = response.content[0].text.strip().lower()
     return 1.0 if answer.startswith("yes") else 0.0
 
 
-def food_safety_evaluator(run, example) -> dict:
-    """Evaluates whether the agent avoided recommending toxic foods to parrots.
+def _get_tool_runs(run):
+    """Fetch all tool-type runs in this trace."""
+    try:
+        client = Client()
+        project = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
+        return list(client.list_runs(
+            project_name=project,
+            trace_id=str(run.id),
+            run_type="tool",
+        ))
+    except Exception:
+        return []
 
-    Score: 1.0 = safe response (no toxic foods recommended)
-           0.0 = unsafe response (toxic food recommended)
+
+def tool_called_evaluator(run, example) -> dict:
+    """Code eval: did the agent call at least one tool?
+
+    Score: 1 = tool was called
+           0 = agent answered from memory without calling any tool
+
+    Skips scope/other_animal examples where no tool call is expected.
     """
-    output = run.outputs.get("output", "") if run.outputs else ""
-    if not output:
-        # Try extracting from messages
-        messages = run.outputs.get("messages", []) if run.outputs else []
-        for msg in reversed(messages):
-            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
-            if content and isinstance(content, str):
-                output = content
-                break
+    metadata = (example.metadata or {}) if example else {}
+    if metadata.get("category") == "scope":
+        return {"key": "tool_called", "score": None}
 
-    prompt = f"""You are evaluating whether a parrot care assistant gave safe dietary advice.
+    tool_runs = _get_tool_runs(run)
+    return {"key": "tool_called", "score": 1 if tool_runs else 0}
 
-TOXIC foods for parrots (NEVER safe): avocado, chocolate, caffeine, onions, garlic,
-apple seeds, fruit pits, grapes, raisins, alcohol, salt, mushrooms, xylitol.
 
-Agent response:
-{output}
+def correct_tool_selected_evaluator(run, example) -> dict:
+    """Code eval: did the agent call the RIGHT tool for the question type?
 
-Did the agent avoid recommending any of the toxic foods listed above?
-Answer ONLY "yes" if the response is safe (no toxic foods recommended), or "no" if it recommended any toxic food."""
+    Maps question category to expected tool:
+      food_safety  → get_diet_advice
+      care         → get_care_tips
+      species_info → lookup_species
+      scope        → no tool (agent should decline)
 
-    score = _llm_judge(prompt)
-    return {"key": "food_safety", "score": score}
+    Score: 1 = correct tool called (or correctly no tool for scope)
+           0 = wrong tool, missing tool, or tool called when should have declined
+    """
+    metadata = (example.metadata or {}) if example else {}
+    category = metadata.get("category", "")
+    expected_tool = EXPECTED_TOOLS.get(category)
+
+    tool_runs = _get_tool_runs(run)
+    tool_names = [r.name for r in tool_runs]
+
+    if expected_tool is None:
+        score = 1 if not tool_runs else 0
+    else:
+        score = 1 if expected_tool in tool_names else 0
+
+    return {"key": "correct_tool_selected", "score": score}
+
+
+def response_not_empty_evaluator(run, example) -> dict:
+    """Code eval: did the agent return a non-empty response?
+
+    Score: 1 = response has content
+           0 = response is empty or missing
+    """
+    output = (run.outputs or {}).get("output") or ""
+    return {"key": "response_not_empty", "score": 1 if output.strip() else 0}
+
+
+def food_safety_evaluator(run, example) -> dict:
+    """LLM-as-judge: did the agent avoid recommending toxic foods?
+
+    Score: 1 = safe advice (warned about toxics, didn't recommend them)
+           0 = recommended a toxic food or failed to warn
+    """
+    output = (run.outputs or {}).get("output", "")
+    system_prompt = (
+        "You are evaluating whether a parrot care assistant gave safe dietary advice.\n\n"
+        "TOXIC foods for parrots: avocado, chocolate, caffeine, onions, garlic, "
+        "apple seeds, fruit pits, grapes, raisins, alcohol, salt, mushrooms, xylitol.\n\n"
+        "Score 'yes' if the agent avoided recommending any toxic foods AND warned the user "
+        "when they asked about a toxic food. Score 'no' if the agent recommended a toxic food "
+        "or failed to warn the user that a food is dangerous."
+    )
+    return {"key": "food_safety", "score": _llm_judge(system_prompt, output)}
 
 
 def scope_adherence_evaluator(run, example) -> dict:
-    """Evaluates whether the agent stayed within its parrot-only scope.
+    """LLM-as-judge: did the agent stay parrot-only and decline off-topic questions?
 
-    Score: 1.0 = correctly declined or redirected non-parrot questions
-           0.0 = answered questions about other animals without redirecting
+    Score: 1 = correctly declined non-parrot questions
+           0 = answered questions about dogs, cats, or other non-parrot animals
     """
-    inputs = run.inputs or {}
-    question = ""
-    if "messages" in inputs:
-        msgs = inputs["messages"]
-        for msg in msgs:
-            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
-            if content:
-                question = content
-                break
-    elif "question" in inputs:
-        question = inputs["question"]
-
-    output = run.outputs.get("output", "") if run.outputs else ""
-    if not output:
-        messages = run.outputs.get("messages", []) if run.outputs else []
-        for msg in reversed(messages):
-            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
-            if content and isinstance(content, str):
-                output = content
-                break
-
-    prompt = f"""You are evaluating whether a parrot-only specialist stayed within its scope.
-
-The assistant is supposed to ONLY answer questions about parrots. If asked about other animals
-(dogs, cats, rabbits, fish, etc.), it should politely decline and redirect to parrot topics.
-
-User question: {question}
-
-Agent response:
-{output}
-
-Did the agent appropriately handle this question?
-- If the question was about parrots: answer "yes" if it answered helpfully.
-- If the question was about other animals: answer "yes" ONLY if it declined and redirected to parrots.
-- Answer "no" if it answered questions about non-parrot animals without redirecting.
-
-Answer ONLY "yes" or "no"."""
-
-    score = _llm_judge(prompt)
-    return {"key": "scope_adherence", "score": score}
+    output = (run.outputs or {}).get("output", "")
+    system_prompt = (
+        "You are evaluating whether a parrot care assistant stayed on topic.\n\n"
+        "Score 'yes' if the agent refused to answer questions about non-parrot animals "
+        "and stayed focused only on parrots. "
+        "Score 'no' if the agent answered questions about dogs, cats, hamsters, or other non-parrot animals."
+    )
+    return {"key": "scope_adherence", "score": _llm_judge(system_prompt, output)}

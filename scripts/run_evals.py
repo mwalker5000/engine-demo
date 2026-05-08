@@ -25,13 +25,22 @@ PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
 
 def run_agent_on_example(inputs: dict) -> dict:
     from agent.agent import invoke_agent
-    response = invoke_agent(question=inputs.get("question", ""))
+    question = (inputs.get("question") or "").strip()
+    if not question:
+        return {"output": ""}
+    response = invoke_agent(question=question)
     return {"output": response}
 
 
 def run_evaluation() -> dict:
     from langsmith import evaluate
-    from evals.evaluators import food_safety_evaluator, scope_adherence_evaluator
+    from evals.evaluators import (
+        tool_called_evaluator,
+        correct_tool_selected_evaluator,
+        response_not_empty_evaluator,
+        food_safety_evaluator,
+        scope_adherence_evaluator,
+    )
 
     print(f"\nRunning evaluation on dataset '{DATASET_NAME}'...")
 
@@ -39,29 +48,38 @@ def run_evaluation() -> dict:
     results = evaluate(
         run_agent_on_example,
         data=DATASET_NAME,
-        evaluators=[food_safety_evaluator, scope_adherence_evaluator],
+        evaluators=[
+            tool_called_evaluator,
+            correct_tool_selected_evaluator,
+            response_not_empty_evaluator,
+            food_safety_evaluator,
+            scope_adherence_evaluator,
+        ],
         experiment_prefix=f"parrot-demo-{demo_user}",
         metadata={"demo": "true", "demo_type": "parrot-expert", "demo_user": demo_user},
     )
 
-    food_safety_scores = []
-    scope_scores = []
+    score_buckets = {
+        "tool_called": [],
+        "correct_tool_selected": [],
+        "response_not_empty": [],
+        "food_safety": [],
+        "scope_adherence": [],
+    }
 
     for result in results:
         for eval_result in result.get("evaluation_results", {}).get("results", []):
-            if eval_result.key == "food_safety":
-                food_safety_scores.append(eval_result.score)
-            elif eval_result.key == "scope_adherence":
-                scope_scores.append(eval_result.score)
+            if eval_result.key in score_buckets and eval_result.score is not None:
+                score_buckets[eval_result.key].append(eval_result.score)
 
-    food_avg = sum(food_safety_scores) / len(food_safety_scores) if food_safety_scores else 0.0
-    scope_avg = sum(scope_scores) / len(scope_scores) if scope_scores else 0.0
-
+    scores = {}
     print(f"\nResults:")
-    print(f"  food_safety:     {food_avg:.2f} ({len(food_safety_scores)} examples)")
-    print(f"  scope_adherence: {scope_avg:.2f} ({len(scope_scores)} examples)")
+    for key, values in score_buckets.items():
+        avg = sum(values) / len(values) if values else 0.0
+        scores[key] = avg
+        print(f"  {key:<25} {avg:.2f} ({len(values)} examples)")
 
-    return {"food_safety": food_avg, "scope_adherence": scope_avg}
+    return scores
 
 
 def check_threshold(scores: dict, threshold: float) -> bool:
