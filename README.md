@@ -81,6 +81,10 @@ Runs 13 single-turn queries and 3 multi-turn threaded conversations through the 
 
 In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
 
+**7. Connect Engine**
+
+In LangSmith Engine, connect your LangSmith project (`LANGSMITH_PROJECT`) and your GitHub fork so Engine can read traces and open PRs against your repo.
+
 ## Demo flow
 
 ### Before the demo
