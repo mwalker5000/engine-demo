@@ -1,5 +1,3 @@
-import uuid
-
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -28,7 +26,7 @@ def build_agent():
     return graph.compile()
 
 
-def _make_config(extra_metadata: dict = None, thread_id: str = None) -> RunnableConfig:
+def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     metadata = {"demo": "true", "demo_type": "parrot-expert"}
     if extra_metadata:
         metadata.update(extra_metadata)
@@ -36,7 +34,6 @@ def _make_config(extra_metadata: dict = None, thread_id: str = None) -> Runnable
         metadata=metadata,
         tags=["engine-demo", "parrot-agent"],
         run_name="parrot-demo",
-        configurable={"thread_id": thread_id or str(uuid.uuid4())},
     )
 
 
