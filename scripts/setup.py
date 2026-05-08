@@ -92,12 +92,26 @@ EVALUATORS = [
 ]
 
 
+# ── Project bootstrap ──────────────────────────────────────────────────────────
+
+def ensure_project_exists() -> None:
+    """Send one trace to create the LangSmith project before online evals are registered.
+
+    Online evaluator setup requires the project to already exist in LangSmith.
+    The project is created automatically when the first trace lands there.
+    """
+    from agent.agent import invoke_agent
+    print(f"\n[0/4] Creating LangSmith project '{PROJECT_NAME}'...")
+    invoke_agent("What vegetables are safe for parrots?")
+    print(f"  Project '{PROJECT_NAME}' is ready.")
+
+
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
 def setup_dataset() -> str:
     """Create or update the evaluation dataset. Returns the dataset name."""
     from evals.dataset import create_or_update_dataset
-    print(f"\n[1/3] Setting up dataset '{DATASET_NAME}'...")
+    print(f"\n[1/4] Setting up dataset '{DATASET_NAME}'...")
     create_or_update_dataset()
     return DATASET_NAME
 
@@ -147,7 +161,7 @@ def run_initial_experiment() -> None:
     )
 
     demo_user = _demo_user or "demo"
-    print(f"\n[2/3] Running initial experiment on dataset '{DATASET_NAME}'...")
+    print(f"\n[2/4] Running initial experiment on dataset '{DATASET_NAME}'...")
     print("      This creates the 'before' scores in LangSmith for Engine to compare against.\n")
 
     def run_agent(inputs: dict) -> dict:
@@ -294,7 +308,7 @@ def setup_online_evaluators(api_key: str) -> None:
     from langsmith import Client
     from langchain_anthropic import ChatAnthropic
 
-    print(f"\n[3/3] Setting up online evaluators on project '{PROJECT_NAME}'...")
+    print(f"\n[3/4] Setting up online evaluators on project '{PROJECT_NAME}'...")
 
     ls_client = Client()
     project_id = get_project_id(ls_client, PROJECT_NAME)
@@ -318,6 +332,7 @@ def main():
         print("Error: LANGSMITH_API_KEY not set.")
         sys.exit(1)
 
+    ensure_project_exists()
     setup_dataset()
     run_initial_experiment()
     setup_online_evaluators(api_key)

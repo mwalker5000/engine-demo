@@ -63,10 +63,11 @@ DEMO_USER=your-name
 python -m scripts.setup
 ```
 
-This does three things in one command:
-1. **Creates the dataset** `parrot-expert-demo-dataset-<your-name>` with 10 curated test cases
-2. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith (this also creates the LangSmith project)
-3. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`
+This does four things in one command:
+1. **Creates the LangSmith project** by sending one trace (required before online evaluators can be registered)
+2. **Creates the dataset** `parrot-expert-demo-dataset-<your-name>` with 10 curated test cases
+3. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith
+4. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`
 
 Only needs to be run once.
 
