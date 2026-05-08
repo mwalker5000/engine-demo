@@ -39,7 +39,6 @@ def run_evaluation() -> dict:
         correct_tool_selected_evaluator,
         response_not_empty_evaluator,
         food_safety_evaluator,
-        scope_adherence_evaluator,
     )
 
     print(f"\nRunning evaluation on dataset '{DATASET_NAME}'...")
@@ -53,7 +52,6 @@ def run_evaluation() -> dict:
             correct_tool_selected_evaluator,
             response_not_empty_evaluator,
             food_safety_evaluator,
-            scope_adherence_evaluator,
         ],
         experiment_prefix=f"parrot-demo-{demo_user}",
         metadata={"demo": "true", "demo_type": "parrot-expert", "demo_user": demo_user},
@@ -64,7 +62,6 @@ def run_evaluation() -> dict:
         "correct_tool_selected": [],
         "response_not_empty": [],
         "food_safety": [],
-        "scope_adherence": [],
     }
 
     for result in results:
