@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 _demo_user = os.getenv("DEMO_USER", "").strip()
-DATASET_NAME = f"parrot-expert-demo-dataset-{_demo_user}" if _demo_user else "parrot-expert-demo-dataset"
-PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
+DATASET_NAME = f"pocket-polly-demo-dataset-{_demo_user}" if _demo_user else "pocket-polly-demo-dataset"
+PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "pocket-polly-demo")
 
 
 def run_agent_on_example(inputs: dict) -> dict:
@@ -53,8 +53,8 @@ def run_evaluation() -> dict:
             response_not_empty_evaluator,
             food_safety_evaluator,
         ],
-        experiment_prefix=f"parrot-demo-{demo_user}",
-        metadata={"demo": "true", "demo_type": "parrot-expert", "demo_user": demo_user},
+        experiment_prefix=f"pocket-polly-demo-{demo_user}",
+        metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
     score_buckets = {
@@ -93,7 +93,7 @@ def check_threshold(scores: dict, threshold: float) -> bool:
 
 ONLINE_EVALUATORS = [
     {
-        "display_name": "parrot-demo-food-safety-online",
+        "display_name": "pocket-polly-demo-food-safety-online",
         "feedback_key": "food_safety",
         "system_prompt": (
             "You are evaluating whether a parrot care assistant gave safe dietary advice.\n\n"
@@ -103,7 +103,7 @@ ONLINE_EVALUATORS = [
         ),
     },
     {
-        "display_name": "parrot-demo-scope-adherence-online",
+        "display_name": "pocket-polly-demo-scope-adherence-online",
         "feedback_key": "scope_adherence",
         "system_prompt": (
             "You are evaluating whether a parrot care assistant stayed on topic.\n\n"

@@ -1,4 +1,4 @@
-"""One-shot setup for the parrot-expert-demo.
+"""One-shot setup for the pocket-polly-demo.
 
 Run this once after cloning and configuring .env. It:
   1. Creates (or updates) the LangSmith evaluation dataset
@@ -26,8 +26,8 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 _demo_user = os.getenv("DEMO_USER", "").strip()
-DATASET_NAME = f"parrot-expert-demo-dataset-{_demo_user}" if _demo_user else "parrot-expert-demo-dataset"
-PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
+DATASET_NAME = f"pocket-polly-demo-dataset-{_demo_user}" if _demo_user else "pocket-polly-demo-dataset"
+PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "pocket-polly-demo")
 
 EVALUATORS = [
     {
@@ -179,8 +179,8 @@ def run_initial_experiment() -> None:
             response_not_empty_evaluator,
             food_safety_evaluator,
         ],
-        experiment_prefix=f"parrot-demo-{demo_user}",
-        metadata={"demo": "true", "demo_type": "parrot-expert", "demo_user": demo_user},
+        experiment_prefix=f"pocket-polly-demo-{demo_user}",
+        metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
     score_buckets = {
@@ -212,7 +212,7 @@ def get_project_id(ls_client, project_name: str) -> str:
 
 
 def delete_existing_evaluators(api_key: str) -> None:
-    """Remove any existing parrot-demo evaluators to avoid duplicates.
+    """Remove any existing pocket-polly-demo evaluators to avoid duplicates.
 
     Order matters: delete run rules first so LangSmith doesn't recreate the
     platform evaluators, then delete the platform evaluators.
@@ -227,7 +227,7 @@ def delete_existing_evaluators(api_key: str) -> None:
     if resp.status_code == 200:
         for rule in resp.json():
             name = rule.get("display_name", "")
-            if name in our_keys or name.startswith("parrot-demo-"):
+            if name in our_keys or name.startswith("pocket-polly-demo-"):
                 requests.delete(
                     f"https://api.smith.langchain.com/api/v1/runs/rules/{rule['id']}",
                     headers={"x-api-key": api_key},
@@ -243,7 +243,7 @@ def delete_existing_evaluators(api_key: str) -> None:
             break
         ids_to_delete = [
             ev["id"] for ev in resp.json().get("evaluators", [])
-            if ev.get("name", "") in our_keys or ev.get("name", "").startswith("parrot-demo-")
+            if ev.get("name", "") in our_keys or ev.get("name", "").startswith("pocket-polly-demo-")
         ]
         for ev_id in ids_to_delete:
             requests.delete(
@@ -340,7 +340,7 @@ def main():
     print(f"\nSetup complete.")
     print(f"  Dataset:     {DATASET_NAME}")
     print(f"  Project:     {PROJECT_NAME}")
-    print(f"  Experiment:  parrot-demo-{_demo_user or 'demo'}-<timestamp> (visible in LangSmith)")
+    print(f"  Experiment:  pocket-polly-demo-{_demo_user or 'demo'}-<timestamp> (visible in LangSmith)")
     print(f"  Online evals: scoring all new traces automatically")
 
 

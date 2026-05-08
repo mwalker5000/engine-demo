@@ -176,7 +176,7 @@ if not st.session_state.messages:
         <line x1="35" y1="64" x2="37" y2="67" stroke="#5ab4d6" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
       <div style="font-size:22px; font-weight:700; color:#ffffff; margin-top:16px; letter-spacing:-0.3px;">PocketPolly</div>
-      <div style="font-size:13px; color:#52525b; margin-top:6px;">Parrot expert agent built on LangGraph</div>
+      <div style="font-size:13px; color:#52525b; margin-top:6px;">Parrot care, powered by LangGraph</div>
     </div>
     """, unsafe_allow_html=True)
 

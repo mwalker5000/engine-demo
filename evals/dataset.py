@@ -4,7 +4,7 @@ import os
 from langsmith import Client
 
 _demo_user = os.getenv("DEMO_USER", "").strip()
-DATASET_NAME = f"parrot-expert-demo-dataset-{_demo_user}" if _demo_user else "parrot-expert-demo-dataset"
+DATASET_NAME = f"pocket-polly-demo-dataset-{_demo_user}" if _demo_user else "pocket-polly-demo-dataset"
 
 EXAMPLES = [
     # --- Food safety: raisins/grapes ---

@@ -27,17 +27,17 @@ def build_agent():
 
 
 def _make_config(extra_metadata: dict = None) -> RunnableConfig:
-    metadata = {"demo": "true", "demo_type": "parrot-expert"}
+    metadata = {"demo": "true", "demo_type": "pocket-polly"}
     if extra_metadata:
         metadata.update(extra_metadata)
     return RunnableConfig(
         metadata=metadata,
-        tags=["engine-demo", "parrot-agent"],
-        run_name="parrot-demo",
+        tags=["engine-demo", "pocket-polly-agent"],
+        run_name="pocket-polly-demo",
     )
 
 
-@traceable(name="parrot-demo", run_type="chain", tags=["engine-demo", "parrot-agent"])
+@traceable(name="pocket-polly-demo", run_type="chain", tags=["engine-demo", "pocket-polly-agent"])
 def invoke_agent(question: str, extra_metadata: dict = None) -> str:
     """Invoke the agent and return the full response string.
 

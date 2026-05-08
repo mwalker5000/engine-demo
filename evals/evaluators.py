@@ -41,7 +41,7 @@ def _get_tool_runs(run):
     """Fetch all tool-type runs in this trace."""
     try:
         client = Client()
-        project = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
+        project = os.getenv("LANGSMITH_PROJECT", "pocket-polly-demo")
         return list(client.list_runs(
             project_name=project,
             trace_id=str(run.id),

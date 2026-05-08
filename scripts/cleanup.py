@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 _demo_user = os.getenv("DEMO_USER", "").strip()
-DATASET_NAME = f"parrot-expert-demo-dataset-{_demo_user}" if _demo_user else "parrot-expert-demo-dataset"
-PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "parrot-expert-demo")
+DATASET_NAME = f"pocket-polly-demo-dataset-{_demo_user}" if _demo_user else "pocket-polly-demo-dataset"
+PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "pocket-polly-demo")
 
 # All feedback keys used by our evaluators or Engine-suggested ones
 EVAL_KEYS = {
@@ -88,7 +88,7 @@ def delete_online_evaluators(api_key: str) -> None:
       - Run rules  (/api/v1/runs/rules)       — the trigger that fires on each trace
       - Platform evaluators (/v1/platform/evaluators) — the LLM-as-judge definition
 
-    Both are matched by display name against EVAL_KEYS and the 'parrot-demo-' prefix,
+    Both are matched by display name against EVAL_KEYS and the 'pocket-polly-demo-' prefix,
     which covers evaluators we created in setup.py and any Engine added during the demo.
     Run rules are deleted first so LangSmith doesn't recreate platform evaluators.
     """
@@ -103,7 +103,7 @@ def delete_online_evaluators(api_key: str) -> None:
     if resp.status_code == 200:
         for rule in resp.json():
             name = rule.get("display_name", "")
-            if name in EVAL_KEYS or name.startswith("parrot-demo-"):
+            if name in EVAL_KEYS or name.startswith("pocket-polly-demo-"):
                 r = requests.delete(
                     f"https://api.smith.langchain.com/api/v1/runs/rules/{rule['id']}",
                     headers={"x-api-key": api_key},
@@ -123,7 +123,7 @@ def delete_online_evaluators(api_key: str) -> None:
         batch_deleted = 0
         for ev in resp.json().get("evaluators", []):
             name = ev.get("name", "")
-            if name in EVAL_KEYS or name.startswith("parrot-demo-"):
+            if name in EVAL_KEYS or name.startswith("pocket-polly-demo-"):
                 r = requests.delete(
                     f"https://api.smith.langchain.com/v1/platform/evaluators/{ev['id']}",
                     headers={"x-api-key": api_key},
