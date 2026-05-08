@@ -15,7 +15,7 @@ Bugs are spread across three files so Engine has to reason about code, not just 
 
 | Bug | File | Effect | Caught by |
 |-----|------|--------|-----------|
-| Bad system prompt | `agent/prompts.py` | Answers any animal; ignores tools; answers from memory instead of calling tools | `scope_adherence`, `tool_called`, `correct_tool_selected` |
+| Bad system prompt | `agent/prompts.py` | Answers any animal; ignores tools; answers from memory instead of calling tools | `tool_called`, `correct_tool_selected` |
 | Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` |
 | Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` |
 | `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` |
@@ -79,7 +79,7 @@ Runs 13 single-turn queries and 3 multi-turn threaded conversations through the 
 
 **6. Add GitHub secrets** (for CI/CD)
 
-In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
+In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
 
 ## Demo flow
 
@@ -108,7 +108,9 @@ streamlit run app.py
 
 ### After the demo
 
-> ⚠️ Cleanup script to be implemented — see Cleanup section below.
+```bash
+python -m scripts.cleanup
+```
 
 ## Scripts
 
@@ -124,7 +126,7 @@ streamlit run app.py
 
 ## Evaluators
 
-Five evaluators score each response 0 or 1, used for both offline dataset runs (CI) and online trace scoring. A mix of deterministic code evals and LLM-as-judge:
+Four evaluators run in CI (offline). A mix of deterministic code evals and LLM-as-judge:
 
 **Code evaluators** (deterministic, fast):
 - **`tool_called`** — did the agent call at least one tool? Skips scope/decline examples. Goes 0→1 when the bad system prompt is fixed.
@@ -133,7 +135,7 @@ Five evaluators score each response 0 or 1, used for both offline dataset runs (
 
 **LLM-as-judge evaluators** (Claude Haiku scores 0 or 1):
 - **`food_safety`** — did the agent warn about toxic foods and avoid recommending them? (catches missing grapes in tools.py)
-- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? (catches bad system prompt)
+- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? (catches bad system prompt) — online evaluator only, not used in CI
 
 ## Online Evaluators
 

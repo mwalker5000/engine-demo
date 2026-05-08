@@ -132,36 +132,56 @@ def _make_offline_evaluator(ev: dict):
 
 
 def run_initial_experiment() -> None:
-    """Run the agent against the dataset to establish 'before' scores."""
+    """Run the agent against the dataset to establish 'before' scores.
+
+    Uses the same 4 evaluators as CI (run_evals.py) so the before/after
+    comparison in LangSmith shows the same keys.
+    """
     from langsmith import evaluate
     from agent.agent import invoke_agent
+    from evals.evaluators import (
+        tool_called_evaluator,
+        correct_tool_selected_evaluator,
+        response_not_empty_evaluator,
+        food_safety_evaluator,
+    )
 
     demo_user = _demo_user or "demo"
     print(f"\n[2/3] Running initial experiment on dataset '{DATASET_NAME}'...")
     print("      This creates the 'before' scores in LangSmith for Engine to compare against.\n")
 
     def run_agent(inputs: dict) -> dict:
-        return {"output": invoke_agent(question=inputs.get("question", ""))}
-
-    offline_evaluators = [_make_offline_evaluator(ev) for ev in EVALUATORS]
+        question = (inputs.get("question") or "").strip()
+        if not question:
+            return {"output": ""}
+        return {"output": invoke_agent(question=question)}
 
     results = evaluate(
         run_agent,
         data=DATASET_NAME,
-        evaluators=offline_evaluators,
+        evaluators=[
+            tool_called_evaluator,
+            correct_tool_selected_evaluator,
+            response_not_empty_evaluator,
+            food_safety_evaluator,
+        ],
         experiment_prefix=f"parrot-demo-{demo_user}",
         metadata={"demo": "true", "demo_type": "parrot-expert", "demo_user": demo_user},
     )
 
-    # Print per-evaluator averages
-    scores = {ev["feedback_key"]: [] for ev in EVALUATORS}
+    score_buckets = {
+        "tool_called": [],
+        "correct_tool_selected": [],
+        "response_not_empty": [],
+        "food_safety": [],
+    }
     for result in results:
         for eval_result in result.get("evaluation_results", {}).get("results", []):
-            if eval_result.key in scores:
-                scores[eval_result.key].append(eval_result.score)
+            if eval_result.key in score_buckets and eval_result.score is not None:
+                score_buckets[eval_result.key].append(eval_result.score)
 
     print("\n  Experiment scores (before):")
-    for key, values in scores.items():
+    for key, values in score_buckets.items():
         avg = sum(values) / len(values) if values else 0.0
         print(f"    {key}: {avg:.2f} ({len(values)} examples)")
 
