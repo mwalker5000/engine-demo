@@ -15,7 +15,7 @@ Bugs are spread across three files so Engine has to reason about code, not just 
 
 | Bug | File | Effect | Caught by |
 |-----|------|--------|-----------|
-| Bad system prompt | `agent/prompts.py` | Answers any animal; ignores tools; never says it doesn't know | `scope_adherence`, `tool_usage` |
+| Bad system prompt | `agent/prompts.py` | Answers any animal; ignores tools; answers from memory instead of calling tools | `scope_adherence`, `tool_called`, `correct_tool_selected` |
 | Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` |
 | Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` |
 | `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` |
@@ -119,18 +119,21 @@ streamlit run app.py
 | `python -m scripts.run_evals` | Runs offline evals against the dataset and prints scores |
 | `python -m scripts.run_evals --skip-dataset` | Re-runs evals against existing dataset (used in CI) |
 | `python -m scripts.run_evals --threshold 0.8` | Exits with code 1 if scores < 0.8 (used in CI) |
-| `python -m scripts.cleanup` | ⚠️ To be implemented — see Cleanup section |
+| `python -m scripts.cleanup` | Resets demo to clean state — see Cleanup section |
 | `streamlit run app.py` | Start the PocketPolly chat UI |
 
 ## Evaluators
 
-Five LLM-as-judge evaluators score each response 0 or 1. The same evaluators are used for both offline dataset runs and online trace scoring:
+Five evaluators score each response 0 or 1, used for both offline dataset runs (CI) and online trace scoring. A mix of deterministic code evals and LLM-as-judge:
 
-- **`food_safety`** — did the agent warn about toxic foods? (catches missing grapes in tools.py)
-- **`scope_adherence`** — did the agent stay parrot-only? (catches bad system prompt)
-- **`tool_usage`** — did the agent call a tool instead of answering from memory? (catches bad system prompt)
-- **`response_completeness`** — is the response complete and untruncated? (catches max_tokens=300)
-- **`factual_accuracy`** — is species/care data correct? (catches wrong budgie lifespan)
+**Code evaluators** (deterministic, fast):
+- **`tool_called`** — did the agent call at least one tool? Skips scope/decline examples. Goes 0→1 when the bad system prompt is fixed.
+- **`correct_tool_selected`** — did the agent call the right tool for the question type? (`get_diet_advice` for food questions, `get_care_tips` for care, `lookup_species` for species info, no tool for out-of-scope). Goes 0→1 when fixed.
+- **`response_not_empty`** — did the agent return a non-empty response?
+
+**LLM-as-judge evaluators** (Claude Haiku scores 0 or 1):
+- **`food_safety`** — did the agent warn about toxic foods and avoid recommending them? (catches missing grapes in tools.py)
+- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? (catches bad system prompt)
 
 ## Online Evaluators
 
@@ -172,12 +175,13 @@ agent/
 
 evals/
 ├── dataset.py        # creates per-user LangSmith dataset (10 curated examples)
-└── evaluators.py     # 5 LLM-as-judge offline evaluators (used in CI)
+└── evaluators.py     # 3 code evals + 2 LLM-as-judge offline evaluators (used in CI)
 
 scripts/
 ├── setup.py          # one-shot setup: dataset + before experiment + online evaluators
-├── generate_traces.py    # populate LangSmith with extra traces
-└── run_evals.py          # offline evals + CI threshold check
+├── generate_traces.py    # populate LangSmith with extra traces and threads
+├── run_evals.py          # offline evals + CI threshold check
+└── cleanup.py            # resets demo to clean state after presentation
 
 .github/workflows/
 └── evals.yml         # CI/CD: runs evals on every PR to main
@@ -187,4 +191,15 @@ app.py                # PocketPolly chat UI (Streamlit)
 
 ## Cleanup
 
-> ⚠️ To be implemented.
+Run after the demo to reset everything for the next presenter:
+
+```bash
+python -m scripts.cleanup
+```
+
+This does three things:
+1. **Resets the dataset** — deletes Engine-added assertion examples and restores the original 10 curated test cases
+2. **Deletes experiments** — removes all before/after experiment runs visible in the LangSmith dataset view
+3. **Deletes online evaluators** — removes all run rules and platform evaluators, including any Engine added during the demo
+
+After cleanup, run `python -m scripts.setup` to start fresh.
