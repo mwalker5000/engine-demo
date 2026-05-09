@@ -35,10 +35,8 @@ def run_agent_on_example(inputs: dict) -> dict:
 def run_evaluation() -> dict:
     from langsmith import evaluate
     from evals.evaluators import (
-        tool_called_evaluator,
-        correct_tool_selected_evaluator,
-        response_not_empty_evaluator,
-        food_safety_evaluator,
+        tool_grounding_evaluator,
+        scope_adherence_evaluator,
     )
 
     print(f"\nRunning evaluation on dataset '{DATASET_NAME}'...")
@@ -48,20 +46,16 @@ def run_evaluation() -> dict:
         run_agent_on_example,
         data=DATASET_NAME,
         evaluators=[
-            tool_called_evaluator,
-            correct_tool_selected_evaluator,
-            response_not_empty_evaluator,
-            food_safety_evaluator,
+            tool_grounding_evaluator,
+            scope_adherence_evaluator,
         ],
         experiment_prefix=f"pocket-polly-demo-{demo_user}",
         metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
     score_buckets = {
-        "tool_called": [],
-        "correct_tool_selected": [],
-        "response_not_empty": [],
-        "food_safety": [],
+        "tool_grounding": [],
+        "scope_adherence": [],
     }
 
     for result in results:
@@ -195,10 +189,7 @@ def main():
     if not args.skip_dataset:
         from evals.dataset import create_or_update_dataset
         print(f"Preparing dataset '{DATASET_NAME}'...")
-        create_or_update_dataset(
-            include_generated=not args.no_generated,
-            n_generated=args.n_generated,
-        )
+        create_or_update_dataset()
 
     scores = run_evaluation()
 

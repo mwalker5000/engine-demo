@@ -154,10 +154,8 @@ def run_initial_experiment() -> None:
     from langsmith import evaluate
     from agent.agent import invoke_agent
     from evals.evaluators import (
-        tool_called_evaluator,
-        correct_tool_selected_evaluator,
-        response_not_empty_evaluator,
-        food_safety_evaluator,
+        tool_grounding_evaluator,
+        scope_adherence_evaluator,
     )
 
     demo_user = _demo_user or "demo"
@@ -174,20 +172,16 @@ def run_initial_experiment() -> None:
         run_agent,
         data=DATASET_NAME,
         evaluators=[
-            tool_called_evaluator,
-            correct_tool_selected_evaluator,
-            response_not_empty_evaluator,
-            food_safety_evaluator,
+            tool_grounding_evaluator,
+            scope_adherence_evaluator,
         ],
         experiment_prefix=f"pocket-polly-demo-{demo_user}",
         metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
     score_buckets = {
-        "tool_called": [],
-        "correct_tool_selected": [],
-        "response_not_empty": [],
-        "food_safety": [],
+        "tool_grounding": [],
+        "scope_adherence": [],
     }
     for result in results:
         for eval_result in result.get("evaluation_results", {}).get("results", []):
