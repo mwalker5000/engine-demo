@@ -65,7 +65,7 @@ python -m scripts.setup
 
 This does four things in one command:
 1. **Creates the LangSmith project** by sending one trace (required before online evaluators can be registered)
-2. **Creates the dataset** `pocket-polly-demo-dataset-<your-name>` with 10 curated test cases
+2. **Creates the dataset** `pocket-polly-demo-dataset-<your-name>` with 3 curated test cases
 3. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith
 4. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`
 
@@ -82,7 +82,11 @@ Runs 13 single-turn queries and 3 multi-turn threaded conversations through the 
 
 In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
 
-**7. Connect Engine**
+**7. Enable GitHub Actions**
+
+In your fork: Actions → (if prompted) enable workflows. GitHub disables Actions on forks by default — this step is required for offline evals to run on PRs.
+
+**8. Connect Engine**
 
 In LangSmith Engine, connect your LangSmith project (`LANGSMITH_PROJECT`) and your GitHub fork so Engine can read traces and open PRs against your repo.
 
@@ -131,16 +135,10 @@ python -m scripts.cleanup
 
 ## Evaluators
 
-Four evaluators run in CI (offline). A mix of deterministic code evals and LLM-as-judge:
+Two LLM-as-judge evaluators run in CI (offline). Claude Haiku scores each 0 or 1:
 
-**Code evaluators** (deterministic, fast):
-- **`tool_called`** — did the agent call at least one tool? Skips scope/decline examples. Goes 0→1 when the bad system prompt is fixed.
-- **`correct_tool_selected`** — did the agent call the right tool for the question type? (`get_diet_advice` for food questions, `get_care_tips` for care, `lookup_species` for species info, no tool for out-of-scope). Goes 0→1 when fixed.
-- **`response_not_empty`** — did the agent return a non-empty response?
-
-**LLM-as-judge evaluators** (Claude Haiku scores 0 or 1):
-- **`food_safety`** — did the agent warn about toxic foods and avoid recommending them? (catches missing grapes in tools.py)
-- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? (catches bad system prompt) — online evaluator only, not used in CI
+- **`tool_grounding`** — did the agent ground its response in tool output rather than answering from memory? Goes 0→1 when the bad system prompt is fixed.
+- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? Goes 0→1 when the bad system prompt is fixed.
 
 ## Online Evaluators
 
@@ -181,8 +179,8 @@ agent/
 └── agent.py          # LangGraph ReAct agent (Bug 4 — max_tokens too low)
 
 evals/
-├── dataset.py        # creates per-user LangSmith dataset (10 curated examples)
-└── evaluators.py     # 3 code evals + 2 LLM-as-judge offline evaluators (used in CI)
+├── dataset.py        # creates per-user LangSmith dataset (3 curated examples)
+└── evaluators.py     # 2 LLM-as-judge offline evaluators (used in CI)
 
 scripts/
 ├── setup.py          # one-shot setup: dataset + before experiment + online evaluators
@@ -205,7 +203,7 @@ python -m scripts.cleanup
 ```
 
 This does three things:
-1. **Resets the dataset** — deletes Engine-added assertion examples and restores the original 10 curated test cases
+1. **Resets the dataset** — deletes Engine-added assertion examples and restores the original 3 curated test cases
 2. **Deletes experiments** — removes all before/after experiment runs visible in the LangSmith dataset view
 3. **Deletes online evaluators** — removes all run rules and platform evaluators, including any Engine added during the demo
 
