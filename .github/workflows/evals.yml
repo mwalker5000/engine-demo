@@ -23,16 +23,10 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Sanitize secrets
-        run: |
-          echo "ANTHROPIC_API_KEY=$(printf '%s' "$ANTHROPIC_API_KEY" | tr -d '\r\n')" >> $GITHUB_ENV
-          echo "LANGSMITH_API_KEY=$(printf '%s' "$LANGSMITH_API_KEY" | tr -d '\r\n')" >> $GITHUB_ENV
+      - name: Run 'before' evals (base branch)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-
-      - name: Run 'before' evals (base branch)
-        env:
           LANGSMITH_TRACING: "true"
           LANGCHAIN_TRACING_V2: "true"
           LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
@@ -50,6 +44,8 @@ jobs:
 
       - name: Run 'after' evals (PR branch)
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
           LANGCHAIN_TRACING_V2: "true"
           LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}

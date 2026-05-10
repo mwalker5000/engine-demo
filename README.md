@@ -82,6 +82,8 @@ Runs 13 single-turn queries and 3 multi-turn threaded conversations through the 
 
 In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
 
+> **Important:** When pasting secrets, make sure there are no trailing newlines or spaces. A trailing newline in `ANTHROPIC_API_KEY` or `LANGSMITH_API_KEY` will cause CI to fail with a connection error.
+
 **7. Enable GitHub Actions**
 
 In your fork: Actions → (if prompted) enable workflows. GitHub disables Actions on forks by default — this step is required for offline evals to run on PRs.
