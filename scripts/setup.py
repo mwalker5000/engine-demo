@@ -18,9 +18,11 @@ Usage:
     python -m scripts.setup_online_evals
 """
 
+import json
 import os
 import sys
 import requests
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -109,10 +111,24 @@ def ensure_project_exists() -> None:
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
 def setup_dataset() -> str:
-    """Create or update the evaluation dataset. Returns the dataset name."""
+    """Create or update the evaluation dataset and tag the version as 'baseline'.
+
+    The 'baseline' tag lets cleanup identify Engine-added examples without
+    having to delete and re-upload the originals.
+    """
     from evals.dataset import create_or_update_dataset
+    from langsmith import Client
+
     print(f"\n[1/4] Setting up dataset '{DATASET_NAME}'...")
     create_or_update_dataset()
+
+    ls_client = Client()
+    ls_client.update_dataset_tag(
+        dataset_name=DATASET_NAME,
+        as_of=datetime.now(timezone.utc),
+        tag="baseline",
+    )
+    print(f"  Tagged dataset version as 'baseline'.")
     return DATASET_NAME
 
 
@@ -145,13 +161,16 @@ def _make_offline_evaluator(ev: dict):
     return evaluator
 
 
-def run_initial_experiment() -> None:
+def run_initial_experiment() -> str | None:
     """Run the agent against the dataset to establish 'before' scores.
 
-    Uses the same 4 evaluators as CI (run_evals.py) so the before/after
+    Uses the same evaluators as CI (run_evals.py) so the before/after
     comparison in LangSmith shows the same keys.
+
+    Returns the experiment name so main() can save it to .demo_state.json
+    for cleanup to use.
     """
-    from langsmith import evaluate
+    from langsmith import evaluate, Client
     from agent.agent import invoke_agent
     from evals.evaluators import (
         tool_grounding_evaluator,
@@ -159,6 +178,7 @@ def run_initial_experiment() -> None:
     )
 
     demo_user = _demo_user or "demo"
+    experiment_prefix = f"before-pocket-polly-demo-{demo_user}"
     print(f"\n[2/4] Running initial experiment on dataset '{DATASET_NAME}'...")
     print("      This creates the 'before' scores in LangSmith for Engine to compare against.\n")
 
@@ -168,30 +188,33 @@ def run_initial_experiment() -> None:
             return {"output": ""}
         return {"output": invoke_agent(question=question)}
 
-    results = evaluate(
+    evaluate(
         run_agent,
         data=DATASET_NAME,
         evaluators=[
             tool_grounding_evaluator,
             scope_adherence_evaluator,
         ],
-        experiment_prefix=f"pocket-polly-demo-{demo_user}",
+        experiment_prefix=experiment_prefix,
         metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
-    score_buckets = {
-        "tool_grounding": [],
-        "scope_adherence": [],
-    }
-    for result in results:
-        for eval_result in result.get("evaluation_results", {}).get("results", []):
-            if eval_result.key in score_buckets and eval_result.score is not None:
-                score_buckets[eval_result.key].append(eval_result.score)
+    # Find the experiment name LangSmith assigned (prefix + timestamp)
+    ls_client = Client()
+    datasets = list(ls_client.list_datasets(dataset_name=DATASET_NAME))
+    if datasets:
+        experiments = list(ls_client.list_projects(reference_dataset_id=datasets[0].id))
+        our_exps = sorted(
+            [e for e in experiments if e.name.startswith(experiment_prefix)],
+            key=lambda e: e.start_time,
+            reverse=True,
+        )
+        if our_exps:
+            name = our_exps[0].name
+            print(f"\n  Experiment scores (before) — '{name}':")
+            return name
 
-    print("\n  Experiment scores (before):")
-    for key, values in score_buckets.items():
-        avg = sum(values) / len(values) if values else 0.0
-        print(f"    {key}: {avg:.2f} ({len(values)} examples)")
+    return None
 
 
 # ── Online evaluators ──────────────────────────────────────────────────────────
@@ -248,7 +271,7 @@ def delete_existing_evaluators(api_key: str) -> None:
             print(f"  Deleted {len(ids_to_delete)} existing evaluator(s)")
 
 
-def create_online_evaluator(api_key: str, ev: dict, project_id: str, model_json: dict) -> None:
+def create_online_evaluator(api_key: str, ev: dict, project_id: str, model_json: dict) -> str | None:
     """Create a run rule with an inline structured evaluator.
 
     Using the run rules API with an inline schema is the only way LangSmith
@@ -294,11 +317,13 @@ def create_online_evaluator(api_key: str, ev: dict, project_id: str, model_json:
     )
     if resp.status_code in (200, 201):
         print(f"  ✅ {ev['feedback_key']}")
+        return resp.json().get("id")
     else:
         print(f"  ❌ {ev['feedback_key']}: {resp.status_code} {resp.text[:200]}")
+        return None
 
 
-def setup_online_evaluators(api_key: str) -> None:
+def setup_online_evaluators(api_key: str) -> list:
     from langsmith import Client
     from langchain_anthropic import ChatAnthropic
 
@@ -310,12 +335,17 @@ def setup_online_evaluators(api_key: str) -> None:
 
     delete_existing_evaluators(api_key)
 
+    our_rule_ids = []
     for ev in EVALUATORS:
-        create_online_evaluator(api_key, ev, project_id, model_json)
+        rule_id = create_online_evaluator(api_key, ev, project_id, model_json)
+        if rule_id:
+            our_rule_ids.append(rule_id)
 
     print("\n  Every future trace will be automatically scored for:")
     for ev in EVALUATORS:
         print(f"    • {ev['feedback_key']}")
+
+    return our_rule_ids
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -328,13 +358,20 @@ def main():
 
     ensure_project_exists()
     setup_dataset()
-    run_initial_experiment()
-    setup_online_evaluators(api_key)
+    setup_experiment_name = run_initial_experiment()
+    our_rule_ids = setup_online_evaluators(api_key)
+
+    # Save state so cleanup can distinguish setup resources from Engine-added ones
+    with open(".demo_state.json", "w") as f:
+        json.dump({
+            "setup_experiment_name": setup_experiment_name,
+            "run_rule_ids": our_rule_ids,
+        }, f, indent=2)
 
     print(f"\nSetup complete.")
-    print(f"  Dataset:     {DATASET_NAME}")
-    print(f"  Project:     {PROJECT_NAME}")
-    print(f"  Experiment:  pocket-polly-demo-{_demo_user or 'demo'}-<timestamp> (visible in LangSmith)")
+    print(f"  Dataset:      {DATASET_NAME}")
+    print(f"  Project:      {PROJECT_NAME}")
+    print(f"  Experiment:   {setup_experiment_name or '(see LangSmith)'}")
     print(f"  Online evals: scoring all new traces automatically")
 
 

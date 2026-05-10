@@ -15,10 +15,10 @@ Bugs are spread across three files so Engine has to reason about code, not just 
 
 | Bug | File | Effect | Caught by |
 |-----|------|--------|-----------|
-| Bad system prompt | `agent/prompts.py` | Answers any animal; ignores tools; answers from memory instead of calling tools | `tool_called`, `correct_tool_selected` |
-| Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` |
-| Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` |
-| `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` |
+| Bad system prompt | `agent/prompts.py` | Answers any animal; answers from memory instead of calling tools | `tool_grounding`, `scope_adherence` |
+| Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` (online) |
+| Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` (online) |
+| `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` (online) |
 
 ## Setup
 
@@ -65,11 +65,11 @@ python -m scripts.setup
 
 This does four things in one command:
 1. **Creates the LangSmith project** by sending one trace (required before online evaluators can be registered)
-2. **Creates the dataset** `pocket-polly-demo-dataset-<your-name>` with 3 curated test cases
+2. **Creates the dataset** `pocket-polly-demo-dataset-<your-name>` with 3 curated test cases, then tags that version as `baseline` in LangSmith
 3. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith
-4. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`
+4. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Their run rule IDs are saved to `.demo_state.json` so cleanup can tell them apart from evaluators Engine adds.
 
-Only needs to be run once.
+Only needs to be run once. Between demos, run `python -m scripts.cleanup` instead.
 
 **5. (Optional) Generate additional traces**
 ```bash
@@ -144,7 +144,7 @@ Two LLM-as-judge evaluators run in CI (offline). Claude Haiku scores each 0 or 1
 
 Online evaluators run automatically on every trace as it arrives in LangSmith — no manual scoring step needed. This gives Engine a continuous signal on live traffic, not just offline evals on a fixed dataset.
 
-All 5 evaluators above are registered as online evaluators by `python -m scripts.setup`. Once registered, LangSmith scores every new trace automatically and surfaces the results in the trace view.
+Five online evaluators are registered by `python -m scripts.setup`: `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Once registered, LangSmith scores every new trace automatically and surfaces the results in the trace view.
 
 The evaluators use `{{output}}` (mustache format) mapped to `outputs["output"]` on each trace. The `@traceable` decorator on `invoke_agent` ensures every trace — including UI traces from the Streamlit app — has this output format.
 
@@ -203,8 +203,8 @@ python -m scripts.cleanup
 ```
 
 This does three things:
-1. **Resets the dataset** — deletes Engine-added assertion examples and restores the original 3 curated test cases
-2. **Deletes experiments** — removes all before/after experiment runs visible in the LangSmith dataset view
-3. **Deletes online evaluators** — removes all run rules and platform evaluators, including any Engine added during the demo
+1. **Removes Engine-added dataset examples** — uses the `baseline` version tag (set by `setup.py`) to identify and delete only the examples Engine added, leaving the original 3 intact
+2. **Removes 'after' experiments** — deletes CI-created experiments while keeping the oldest one (the 'before' baseline from `setup.py`)
+3. **Removes Engine-added online evaluators** — uses saved run rule IDs from `.demo_state.json` to delete only evaluators Engine added, leaving the 5 from `setup.py` in place
 
-After cleanup, run `python -m scripts.setup` to start fresh.
+After cleanup, the demo is ready to run again — no need to re-run `setup.py`.

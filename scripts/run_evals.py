@@ -32,7 +32,7 @@ def run_agent_on_example(inputs: dict) -> dict:
     return {"output": response}
 
 
-def run_evaluation() -> dict:
+def run_evaluation(experiment_prefix: str) -> dict:
     from langsmith import evaluate
     from evals.evaluators import (
         tool_grounding_evaluator,
@@ -49,7 +49,7 @@ def run_evaluation() -> dict:
             tool_grounding_evaluator,
             scope_adherence_evaluator,
         ],
-        experiment_prefix=f"pocket-polly-demo-{demo_user}",
+        experiment_prefix=experiment_prefix,
         metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
     )
 
@@ -184,6 +184,8 @@ def main():
     parser.add_argument("--n-generated", type=int, default=8)
     parser.add_argument("--setup-online-eval", action="store_true")
     parser.add_argument("--threshold", type=float, default=None, help="Fail (exit 1) if avg score below this value")
+    demo_user = os.getenv("DEMO_USER", "demo")
+    parser.add_argument("--experiment-prefix", type=str, default=f"after-pocket-polly-demo-{demo_user}")
     args = parser.parse_args()
 
     if not args.skip_dataset:
@@ -191,7 +193,7 @@ def main():
         print(f"Preparing dataset '{DATASET_NAME}'...")
         create_or_update_dataset()
 
-    scores = run_evaluation()
+    scores = run_evaluation(experiment_prefix=args.experiment_prefix)
 
     if args.setup_online_eval:
         setup_online_eval()

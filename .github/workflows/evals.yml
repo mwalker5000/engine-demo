@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -20,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run offline evals
+      - name: Run 'before' evals (base branch)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
@@ -30,4 +33,23 @@ jobs:
           LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
           DEMO_USER: ${{ secrets.DEMO_USER }}
         run: |
-          uv run python -m scripts.run_evals --skip-dataset --threshold 0.8
+          uv run python -m scripts.run_evals --skip-dataset --experiment-prefix "before-pocket-polly-demo-$DEMO_USER"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install dependencies (PR branch)
+        run: uv sync
+
+      - name: Run 'after' evals (PR branch)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_TRACING: "true"
+          LANGCHAIN_TRACING_V2: "true"
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+          LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
+          DEMO_USER: ${{ secrets.DEMO_USER }}
+        run: |
+          uv run python -m scripts.run_evals --skip-dataset --threshold 0.8 --experiment-prefix "after-pocket-polly-demo-$DEMO_USER"
