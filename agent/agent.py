@@ -3,7 +3,6 @@ from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.prebuilt import ToolNode, tools_condition
-from langsmith import traceable
 
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOLS
@@ -37,13 +36,8 @@ def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     )
 
 
-@traceable(name="pocket-polly-demo", run_type="chain", tags=["engine-demo", "pocket-polly-agent"])
-def invoke_agent(question: str, extra_metadata: dict = None) -> str:
-    """Invoke the agent and return the full response string.
-
-    @traceable gives the root LangSmith trace outputs: {"output": "..."},
-    which online evaluators can reference via variable_mapping {"output": "output"}.
-    """
+def invoke_agent(question: str, extra_metadata: dict = None, **kwargs) -> str:
+    """Invoke the agent and return the full response string."""
     agent = build_agent()
     result = agent.invoke(
         {"messages": [{"role": "user", "content": question}]},
@@ -56,12 +50,7 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> str:
 
 
 def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = None):
-    """Stream the agent response token by token. Yields str chunks.
-
-    Calls invoke_agent internally so every trace — including UI traces — has
-    outputs: {"output": "..."} for online evaluators to score.
-    thread_id groups conversation turns under one thread in LangSmith.
-    """
+    """Stream the agent response token by token. Yields str chunks."""
     kwargs = {}
     if thread_id:
         kwargs["langsmith_extra"] = {"metadata": {"thread_id": thread_id}}
