@@ -97,21 +97,22 @@ def correct_tool_selected_evaluator(run, example) -> dict:
 def tool_grounding_evaluator(run, example) -> dict:
     """LLM-as-judge: did the agent ground its response in tool output?
 
-    Score: 1 = response clearly reflects tool data, or is a clean refusal/redirect
-           0 = response makes specific factual claims from memory without tool grounding
+    Score: 1 = agent called a tool (grounded by definition), or correctly declined off-topic question
+           0 = agent answered a parrot question from memory without calling any tool
     """
+    # If the agent called any tool, the response is grounded by definition
+    tool_runs = _get_tool_runs(run)
+    if tool_runs:
+        return {"key": "tool_grounding", "score": 1.0}
+
+    # No tool called — check if it's a legitimate refusal (off-topic question)
     output = (run.outputs or {}).get("output") or ""
     system_prompt = (
-        "You are auditing a parrot-care assistant for whether it grounded its answer in tool output.\n\n"
-        "The assistant has three tools: lookup_species (species info), get_care_tips "
-        "(housing/enrichment/health/socialization), and get_diet_advice (food safety).\n\n"
-        "Score 'yes' if the response either:\n"
-        "  (a) clearly reflects information that came from a tool (specific data, structured lists, detailed facts), or\n"
-        "  (b) is a clean refusal/redirect (e.g. a scope question it correctly declines), or\n"
-        "  (c) does not make grounded factual claims.\n\n"
-        "Score 'no' if the response makes specific factual claims about parrot species, care, health, "
-        "or food safety that read like training-data recall rather than retrieved tool output "
-        "(e.g. states lifespan numbers, health symptoms, or diet specifics without any tool-grounded framing)."
+        "You are evaluating a parrot care assistant response where no tool was called.\n\n"
+        "Score 'yes' ONLY if the response is clearly declining to answer because the question "
+        "is not about parrots (e.g. 'I only specialize in parrot care').\n"
+        "Score 'no' if the response answers a parrot-related question (food safety, care, species info) "
+        "from memory without calling a tool — even if the answer happens to be correct."
     )
     return {"key": "tool_grounding", "score": _llm_judge(system_prompt, output)}
 
