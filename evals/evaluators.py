@@ -37,7 +37,7 @@ def tool_selection_evaluator(run, example) -> dict:
     question = (example.inputs or {}).get("question", "") if example else ""
     trajectory = f"Question: {question}\n\nOutputs: {outputs}"
 
-    user_message = (
+    system_prompt = (
         "You are an expert data labeler. Your task is to grade the accuracy of an AI agent's "
         "tool selection during the resolution of a user query.\n\n"
         "<Rubric>\n"
@@ -55,16 +55,19 @@ def tool_selection_evaluator(run, example) -> dict:
         "3. Evaluate the choice of tools and whether any tools were unnecessary, missing, or "
         "could have been replaced with a more appropriate alternative\n"
         "</Instructions>\n\n"
+        "Answer ONLY 'yes' (score 1) or 'no' (score 0). Do not explain."
+    )
+    user_message = (
         "Please grade the following trajectory according to the above instructions:\n\n"
         "<trajectory>\n"
         f"{trajectory}\n"
-        "</trajectory>\n\n"
-        "Answer ONLY 'yes' (score 1) or 'no' (score 0)."
+        "</trajectory>"
     )
     client = _get_anthropic_client()
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=16,
+        system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
     answer = response.content[0].text.strip().lower()
