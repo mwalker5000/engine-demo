@@ -4,10 +4,11 @@ A parrot expert chatbot with intentional bugs, built to demonstrate LangSmith En
 
 ## What this demos
 
-1. **Engine identifies bugs from traces** — the agent has bugs in the prompt, tools, and agent config that cause bad responses
+1. **Engine identifies bugs** — the agent has bugs in the prompt and code that cause bad responses
 2. **Engine proposes a PR fix** — targets the root cause code and opens a PR on your fork
-3. **Offline evals in CI/CD** — the PR can't merge until eval scores pass a threshold
-4. **Before/after scores in LangSmith** — both "before" and "after" experiments created automatically by CI when Engine opens a PR
+3. **Engine proposes offline examples and online evals to add** — expand dataset coverage and monitoring with one click
+4. **Offline evals in CI/CD** — the PR can't merge until eval scores pass a threshold
+5. **Before/after scores in LangSmith** — both "before" and "after" experiments created automatically by CI when Engine opens a PR
 
 ## The bugs
 
@@ -111,9 +112,9 @@ streamlit run app.py
 1. Show PocketPolly UI — ask questions (species lookup, care tips, diet advice, etc.)
 2. Show traces in LangSmith with online eval scores (`food_safety`, `scope_adherence`, etc.)
 3. Engine analyzes traces and identifies root causes across prompt and code
-4. Add Engine-suggested dataset examples — show ability to edit in annotation queue
+4. Add Engine-suggested offline examples — show ability to edit in annotation queue
 5. Engine opens a PR on your fork
-6. GitHub Actions runs evals on the PR branch (fixed code) — scores pass ✅
+6. GitHub Actions runs evals on main (before experiment) and the PR branch (after experiment) — after scores pass ✅
 7. Merge the PR
 8. Add Engine-suggested online eval
 9. Show the experiments in LangSmith — before/after score comparison
@@ -141,13 +142,13 @@ python -m scripts.cleanup
 Two LLM-as-judge evaluators run in CI (offline). Claude Haiku scores each 0 or 1:
 
 - **`tool_grounding`** — did the agent ground its response in tool output rather than answering from memory? Goes 0→1 when the bad system prompt is fixed.
-- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions? Goes 0→1 when the bad system prompt is fixed.
+- **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions?
 
 ## Online Evaluators
 
-Online evaluators run automatically on every trace as it arrives in LangSmith — no manual scoring step needed. This gives Engine a continuous signal on live traffic, not just offline evals on a fixed dataset.
+Online evaluators run automatically on every trace as it arrives in LangSmith. This gives Engine a continuous signal on live traffic, not just offline evals on a fixed dataset.
 
-Five online evaluators are registered by `python -m scripts.setup`: `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Once registered, LangSmith scores every new trace automatically and surfaces the results in the trace view.
+Five online evaluators are registered by `python -m scripts.setup`: `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`.
 
 ## CI/CD
 
@@ -160,7 +161,7 @@ Add these secrets to your repo (Settings → Secrets → Actions):
 - `LANGSMITH_WORKSPACE_ID`
 - `DEMO_USER`
 
-Run `python -m scripts.setup` locally first so the dataset exists for CI to run against. `DEMO_USER` and `LANGSMITH_PROJECT` must match what you used locally — that's how CI finds the right dataset.
+`DEMO_USER` and `LANGSMITH_PROJECT` must match what you used locally — that's how CI finds the right dataset.
 
 ```
 PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.7
@@ -169,7 +170,7 @@ PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.7
                                scores ≥ 0.7 → ✅ mergeable
 ```
 
-CI runs against the PR branch code — so Engine's fix produces high scores, creating the "after" experiment in LangSmith automatically. Because `--skip-dataset` fetches the existing dataset from LangSmith by name, any examples Engine adds to the dataset are included in the eval run automatically.
+CI runs evals on both the base branch (creating the "before" experiment) and the PR branch (creating the "after" experiment) in LangSmith automatically. Because `--skip-dataset` fetches the existing dataset from LangSmith by name, any examples Engine adds to the dataset are included in the eval run automatically.
 
 ## Repo structure
 
