@@ -1,9 +1,10 @@
 """Clean up LangSmith resources after the pocket-polly demo.
 
 Resets the demo to a clean state so it can be run again without re-running setup:
-  1. Removes Engine-added examples from the dataset (restores to 'baseline' tag)
-  2. Removes 'after' experiments — keeps the oldest 'before' experiment
+  1. Resets dataset to the original 3 examples (deletes Engine-added examples)
+  2. Deletes all experiments — CI/CD generates fresh before/after on every PR
   3. Removes Engine-added online evaluators (keeps the 5 registered by setup.py)
+  4. Force-resets the fork's main branch to upstream (removes Engine's merged PR)
 
 Usage:
     python -m scripts.cleanup
@@ -11,7 +12,9 @@ Usage:
 
 import json
 import os
+import subprocess
 import sys
+import time
 import requests
 from dotenv import load_dotenv
 
@@ -25,52 +28,48 @@ PROJECT_NAME = os.getenv("LANGSMITH_PROJECT", "pocket-polly-demo")
 # ── 1. Reset dataset ───────────────────────────────────────────────────────────
 
 def reset_dataset() -> None:
-    """Delete only Engine-added examples, keeping the original 3.
+    """Reset dataset to the original 3 examples by deleting all and re-uploading.
 
-    setup.py tags the post-upload state as 'baseline'. This function reads
-    example IDs from that tag and deletes anything added after it.
+    Engine may add examples and re-tag baseline, so we don't rely on the tag.
+    Instead, delete everything and re-upload the canonical 3 from dataset.py.
     """
     from langsmith import Client
+    from evals.dataset import EXAMPLES
 
-    print(f"\n[1/3] Removing Engine-added examples from dataset '{DATASET_NAME}'...")
+    print(f"\n[1/3] Resetting dataset '{DATASET_NAME}' to original 3 examples...")
     ls_client = Client()
 
-    try:
-        baseline_ids = {e.id for e in ls_client.list_examples(dataset_name=DATASET_NAME, as_of="baseline")}
-    except Exception as e:
-        print(f"  Warning: could not read 'baseline' tag ({e}). Skipping dataset reset.")
+    datasets = list(ls_client.list_datasets(dataset_name=DATASET_NAME))
+    if not datasets:
+        print(f"  Dataset '{DATASET_NAME}' not found. Skipping.")
         return
 
-    all_examples = list(ls_client.list_examples(dataset_name=DATASET_NAME))
-    to_delete = [e.id for e in all_examples if e.id not in baseline_ids]
+    dataset = datasets[0]
+    existing = list(ls_client.list_examples(dataset_id=dataset.id))
+    if existing:
+        ls_client.delete_examples([e.id for e in existing])
+        print(f"  Deleted {len(existing)} example(s).")
 
-    if to_delete:
-        ls_client.delete_examples(to_delete)
-        print(f"  Removed {len(to_delete)} Engine-added example(s). Original {len(baseline_ids)} kept.")
-    else:
-        print(f"  No Engine-added examples found. Dataset unchanged.")
+    ls_client.create_examples(
+        dataset_id=dataset.id,
+        inputs=[e["input"] for e in EXAMPLES],
+        outputs=[e["output"] for e in EXAMPLES],
+        metadata=[e.get("metadata", {}) for e in EXAMPLES],
+    )
+    print(f"  Re-uploaded {len(EXAMPLES)} original examples.")
 
 
 # ── 2. Delete 'after' experiments ─────────────────────────────────────────────
 
 def delete_ci_experiments() -> None:
-    """Delete all CI-generated experiments, keeping only the one setup.py created.
+    """Delete all experiments linked to the dataset.
 
-    setup.py saves the experiment name it created to .demo_state.json. Every
-    other experiment linked to the dataset (before- and after- from CI) is removed.
+    CI/CD generates fresh before/after experiments on every PR, so there is
+    no experiment worth keeping between demos.
     """
     from langsmith import Client
 
-    print(f"\n[2/3] Removing CI-generated experiments from dataset '{DATASET_NAME}'...")
-
-    try:
-        with open(".demo_state.json") as f:
-            state = json.load(f)
-        setup_experiment_name = state.get("setup_experiment_name")
-    except FileNotFoundError:
-        print("  Warning: .demo_state.json not found — run 'python -m scripts.setup' first.")
-        print("  Skipping experiment cleanup.")
-        return
+    print(f"\n[2/3] Removing all experiments from dataset '{DATASET_NAME}'...")
 
     ls_client = Client()
     datasets = list(ls_client.list_datasets(dataset_name=DATASET_NAME))
@@ -84,17 +83,12 @@ def delete_ci_experiments() -> None:
         print("  No experiments found.")
         return
 
-    to_delete = [e for e in experiments if e.name != setup_experiment_name]
-
-    if not to_delete:
-        print("  No CI-generated experiments found.")
-        return
-
-    for exp in to_delete:
+    for exp in experiments:
         ls_client.delete_project(project_name=exp.name)
         print(f"  Deleted '{exp.name}'")
+        time.sleep(0.3)
 
-    print(f"  Deleted {len(to_delete)} CI-generated experiment(s). Kept '{setup_experiment_name}'.")
+    print(f"  Deleted {len(experiments)} experiment(s).")
 
 
 # ── 3. Delete Engine-added online evaluators ───────────────────────────────────
@@ -156,6 +150,61 @@ def delete_engine_evaluators(api_key: str) -> None:
         print(f"  Deleted {deleted} Engine-added evaluator(s).")
 
 
+# ── 4. Reset fork to upstream main ────────────────────────────────────────────
+
+def reset_fork_to_upstream() -> None:
+    """Force-reset the fork's main branch to match upstream langchain-samples/engine-demo.
+
+    This removes Engine's merged PR from the fork's history, restoring the
+    buggy agent state so the demo can be run again.
+    """
+    upstream = "langchain-samples/engine-demo"
+
+    print(f"\n[4/4] Resetting fork main branch to upstream '{upstream}'...")
+
+    # Get the fork's remote URL from git
+    result = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print("  Warning: could not determine fork remote. Skipping.")
+        return
+
+    fork_url = result.stdout.strip()
+    # Parse owner/repo from SSH or HTTPS URL
+    if "github.com:" in fork_url:
+        fork_repo = fork_url.split("github.com:")[1].removesuffix(".git")
+    elif "github.com/" in fork_url:
+        fork_repo = fork_url.split("github.com/")[1].removesuffix(".git")
+    else:
+        print(f"  Warning: unrecognised remote URL '{fork_url}'. Skipping.")
+        return
+
+    # Get upstream main SHA
+    result = subprocess.run(
+        ["gh", "api", f"repos/{upstream}/commits/main", "--jq", ".sha"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"  Warning: could not fetch upstream SHA ({result.stderr.strip()}). Skipping.")
+        return
+    upstream_sha = result.stdout.strip()
+
+    # Force-reset fork main to upstream SHA
+    result = subprocess.run(
+        ["gh", "api", f"repos/{fork_repo}/git/refs/heads/main",
+         "-X", "PATCH",
+         "-f", f"sha={upstream_sha}",
+         "-f", "force=true"],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print(f"  Reset '{fork_repo}' main to upstream ({upstream_sha[:8]}).")
+    else:
+        print(f"  Warning: reset failed ({result.stderr.strip()}).")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -171,6 +220,7 @@ def main():
     reset_dataset()
     delete_ci_experiments()
     delete_engine_evaluators(api_key)
+    reset_fork_to_upstream()
 
     print(f"\nCleanup complete. Ready for the next demo.")
 
