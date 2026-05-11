@@ -27,6 +27,16 @@ def run_agent_on_example(inputs: dict) -> dict:
     from agent.agent import invoke_agent
     question = (inputs.get("question") or "").strip()
     if not question:
+        # Engine-generated examples use chat message format
+        messages = inputs.get("messages") or inputs.get("input") or []
+        if isinstance(messages, list):
+            for msg in messages:
+                role = msg.get("role", "") if isinstance(msg, dict) else ""
+                content = msg.get("content", "") if isinstance(msg, dict) else ""
+                if role in ("human", "user") and content:
+                    question = content.strip()
+                    break
+    if not question:
         return {"output": "", "tools_called": []}
     result = invoke_agent(question=question)
     return {"output": result["output"], "tools_called": result.get("tools_called", [])}
