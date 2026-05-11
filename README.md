@@ -15,10 +15,10 @@ Bugs are spread across three files so Engine has to reason about code, not just 
 
 | Bug | File | Effect | Caught by |
 |-----|------|--------|-----------|
-| Bad system prompt | `agent/prompts.py` | Answers any animal; answers from memory instead of calling tools | `tool_grounding`, `scope_adherence` |
-| Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` (online) |
-| Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` (online) |
-| `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` (online) |
+| Bad system prompt | `agent/prompts.py` | Answers any animal; answers from memory instead of calling tools | `tool_usage`, `scope_adherence` |
+| Grapes missing from toxic list | `agent/tools.py` | Agent tells users raisins are safe for parrots | `food_safety` |
+| Wrong budgie lifespan | `agent/tools.py` | Returns "20-30 years" instead of the correct "5-10 years" | `factual_accuracy` |
+| `max_tokens=300` | `agent/agent.py` | Truncates responses on complex questions | `response_completeness` |
 
 ## Setup
 
@@ -81,7 +81,7 @@ Runs 13 single-turn queries and 3 multi-turn threaded conversations through the 
 
 In your fork: Settings → Secrets → Actions → add `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_WORKSPACE_ID`, and `DEMO_USER`.
 
-> **Important:** When pasting secrets, make sure there are no trailing newlines or spaces. A trailing newline in `ANTHROPIC_API_KEY` or `LANGSMITH_API_KEY` will cause CI to fail with a connection error.
+> **Important:** When pasting secrets, make sure there are no trailing newlines or spaces.
 
 **7. Enable GitHub Actions**
 
@@ -111,7 +111,7 @@ streamlit run app.py
 1. Show PocketPolly UI — ask questions (species lookup, care tips, diet advice, etc.)
 2. Show traces in LangSmith with online eval scores (`food_safety`, `scope_adherence`, etc.)
 3. Engine analyzes traces and identifies root causes across prompt and code
-4. Add Engine-suggested dataset examples
+4. Add Engine-suggested dataset examples — show ability to edit in annotation queue
 5. Engine opens a PR on your fork
 6. GitHub Actions runs evals on the PR branch (fixed code) — scores pass ✅
 7. Merge the PR
