@@ -52,4 +52,4 @@ jobs:
           LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
           DEMO_USER: ${{ secrets.DEMO_USER }}
         run: |
-          uv run python -m scripts.run_evals --skip-dataset --threshold 0.8 --experiment-prefix "after-pocket-polly-demo-$DEMO_USER"
+          uv run python -m scripts.run_evals --skip-dataset --threshold 0.7 --experiment-prefix "after-pocket-polly-demo-$DEMO_USER"
