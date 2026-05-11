@@ -83,12 +83,24 @@ def delete_ci_experiments() -> None:
         print("  No experiments found.")
         return
 
+    deleted = 0
     for exp in experiments:
-        ls_client.delete_project(project_name=exp.name)
-        print(f"  Deleted '{exp.name}'")
-        time.sleep(0.3)
+        for attempt in range(3):
+            try:
+                ls_client.delete_project(project_name=exp.name)
+                print(f"  Deleted '{exp.name}'")
+                deleted += 1
+                time.sleep(1.0)
+                break
+            except Exception as e:
+                if "429" in str(e) and attempt < 2:
+                    print(f"  Rate limited, waiting 5s...")
+                    time.sleep(5.0)
+                else:
+                    print(f"  Failed to delete '{exp.name}': {e}")
+                    break
 
-    print(f"  Deleted {len(experiments)} experiment(s).")
+    print(f"  Deleted {deleted} experiment(s).")
 
 
 # ── 3. Delete Engine-added online evaluators ───────────────────────────────────
