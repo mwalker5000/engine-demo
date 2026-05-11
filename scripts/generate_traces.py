@@ -92,7 +92,7 @@ def main():
                 result = invoke_agent(
                     question=question,
                     extra_metadata={"category": turn["category"], "subcategory": turn["subcategory"]},
-                    langsmith_extra={"metadata": {"thread_id": thread_id}},
+                    thread_id=thread_id,
                 )
                 response = result["output"]
                 print(f"    → {response[:80].replace(chr(10), ' ')}{'...' if len(response) > 80 else ''}")

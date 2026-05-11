@@ -36,7 +36,7 @@ def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     )
 
 
-def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
+def invoke_agent(question: str, extra_metadata: dict = None, thread_id: str = None) -> dict:
     """Invoke the agent and return the full conversation as messages plus a flat tools_called list.
 
     The messages list (input, tool calls, tool results, final response) is stored
@@ -44,9 +44,12 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
     tools_called is a flat list of tool names so evaluators can check it directly.
     """
     agent = build_agent()
+    merged_metadata = {**(extra_metadata or {})}
+    if thread_id:
+        merged_metadata["thread_id"] = thread_id
     result = agent.invoke(
         {"messages": [{"role": "user", "content": question}]},
-        _make_config(extra_metadata),
+        _make_config(merged_metadata or None),
     )
     output = ""
     for msg in reversed(result["messages"]):
@@ -63,8 +66,5 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
 
 def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = None):
     """Stream the agent response token by token. Yields str chunks."""
-    metadata = extra_metadata or {}
-    if thread_id:
-        metadata = {**metadata, "thread_id": thread_id}
-    result = invoke_agent(question, metadata if metadata else None)
+    result = invoke_agent(question, extra_metadata, thread_id=thread_id)
     yield from result["output"]
