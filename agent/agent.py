@@ -63,8 +63,8 @@ def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
 
 def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = None):
     """Stream the agent response token by token. Yields str chunks."""
-    kwargs = {}
+    metadata = extra_metadata or {}
     if thread_id:
-        kwargs["langsmith_extra"] = {"metadata": {"thread_id": thread_id}}
-    result = invoke_agent(question, extra_metadata, **kwargs)
+        metadata = {**metadata, "thread_id": thread_id}
+    result = invoke_agent(question, metadata if metadata else None)
     yield from result["output"]
