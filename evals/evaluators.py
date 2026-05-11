@@ -1,5 +1,6 @@
 """Evaluators for the parrot expert demo."""
 
+import json
 from anthropic import Anthropic
 
 _anthropic_client = None
@@ -30,44 +31,28 @@ def _llm_judge(system_prompt: str, output: str) -> float:
 def tool_grounding_evaluator(run, example) -> dict:
     """Did the agent call a tool or give a clean off-topic refusal?
 
-    Reads tools_called from run.outputs — no LangSmith API calls needed.
-    Score: 1 = tools were called (grounded), or clean off-topic refusal
-           0 = answered a parrot question from memory without calling any tool
+    Score: 1 = tools were called, or question was not parrot-related (no tool needed)
+           0 = parrot question answered from memory without calling any tool
     """
-    tools_called = (run.outputs or {}).get("tools_called", [])
-    if tools_called:
-        return {"key": "tool_grounding", "score": 1.0}
-
-    output = (run.outputs or {}).get("output") or ""
-
-    # Correct scope refusal — no tools needed for off-topic questions
-    _refusal_phrases = ["only specialize in parrot", "specialize in parrot care", "only answer parrot", "only help with parrot"]
-    if any(phrase in output.lower() for phrase in _refusal_phrases):
-        return {"key": "tool_grounding", "score": 1.0}
-
     question = (example.inputs or {}).get("question", "") if example else ""
-    trajectory = f"Question: {question}\n\nTools called: none\n\nAgent response: {output}"
+    full_output = json.dumps(run.outputs or {})
+    trajectory = f"Question: {question}\n\nAgent output: {full_output}"
     system_prompt = (
-        "You are an expert data labeler. Your task is to grade the accuracy of an AI agent's "
-        "tool selection during the resolution of a user query.\n\n"
-        "<Rubric>\n"
-        "Accurate tool selection:\n"
-        "- Uses the most appropriate tool for each step given the context\n"
-        "- Avoids unnecessary or redundant tool calls\n"
-        "- Uses tools in a logical order where dependencies exist\n"
-        "- Is semantically equivalent to the provided reference tool sequence, if present\n"
-        "</Rubric>\n\n"
-        "<Instructions>\n"
-        "1. Give a score of zero if no tools were called and a parrot-related question were asked. "
-        "If no tools were called and an out-of-scope question were asked, give a score of one.\n"
-        "2. Grade the following thread, evaluating whether the agent selected the right tools "
-        "in the right order to resolve the user's query efficiently.\n"
-        "3. Evaluate the choice of tools and whether any tools were unnecessary, missing, or "
-        "could have been replaced with a more appropriate alternative\n"
-        "</Instructions>\n\n"
-        "Please grade the following trajectory according to the above instructions:"
+        "You are grading a parrot care assistant that has tools for species lookup, care tips, and diet advice.\n\n"
+        "Look at the tools_called field in the agent output.\n"
+        "Score 'yes' if tools_called is non-empty (agent used tools).\n"
+        "Score 'yes' if tools_called is empty AND the question is NOT about parrots (correct refusal, no tools needed).\n"
+        "Score 'no' if tools_called is empty AND the question IS about parrots (agent should have called a tool)."
     )
-    return {"key": "tool_grounding", "score": _llm_judge(system_prompt, trajectory)}
+    client = _get_anthropic_client()
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=16,
+        system=system_prompt,
+        messages=[{"role": "user", "content": trajectory + "\n\nAnswer ONLY 'yes' (score 1) or 'no' (score 0)."}],
+    )
+    answer = response.content[0].text.strip().lower()
+    return {"key": "tool_grounding", "score": 1.0 if answer.startswith("yes") else 0.0}
 
 
 def scope_adherence_evaluator(run, example) -> dict:
