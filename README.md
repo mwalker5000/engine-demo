@@ -7,7 +7,7 @@ A parrot expert chatbot with intentional bugs, built to demonstrate LangSmith En
 1. **Engine identifies bugs from traces** — the agent has bugs in the prompt, tools, and agent config that cause bad responses
 2. **Engine proposes a PR fix** — targets the root cause code and opens a PR on your fork
 3. **Offline evals in CI/CD** — the PR can't merge until eval scores pass a threshold
-4. **Before/after scores in LangSmith** — "before" experiment run locally pre-demo; "after" created automatically by CI on Engine's PR
+4. **Before/after scores in LangSmith** — both "before" and "after" experiments created automatically by CI when Engine opens a PR
 
 ## The bugs
 
@@ -63,15 +63,14 @@ DEMO_USER=your-name
 python -m scripts.setup
 ```
 
-This does four things in one command:
+This does three things in one command:
 1. **Creates the LangSmith project** by sending one trace (required before online evaluators can be registered)
 2. **Creates the dataset** `pocket-polly-demo-dataset-<your-name>` with 3 curated test cases, then tags that version as `baseline` in LangSmith
-3. **Runs an initial experiment** through the dataset with the buggy agent to establish "before" scores in LangSmith
-4. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Their run rule IDs are saved to `.demo_state.json` so cleanup can tell them apart from evaluators Engine adds.
+3. **Creates 5 online evaluators** in the LangSmith Evaluators UI at 100% sampling rate — every future trace is automatically scored for `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Their run rule IDs are saved to `.demo_state.json` so cleanup can tell them apart from evaluators Engine adds.
 
 Only needs to be run once. Between demos, run `python -m scripts.cleanup` instead.
 
-**5. (Optional) Generate additional traces**
+**5. Generate traces**
 ```bash
 python -m scripts.generate_traces
 ```
@@ -97,10 +96,10 @@ In LangSmith Engine, connect your LangSmith project (`LANGSMITH_PROJECT`) and yo
 ### Before the demo
 
 ```bash
-# One-shot setup: creates dataset, runs initial "before" experiment, sets up online evaluators
+# One-shot setup: creates dataset, sets up online evaluators
 python -m scripts.setup
 
-# (Optional) generate more traces beyond the dataset examples
+# Generate more traces including threads
 python -m scripts.generate_traces
 
 # Start the chat UI
@@ -109,13 +108,15 @@ streamlit run app.py
 
 ### During the demo
 
-1. Show PocketPolly UI — ask buggy questions (raisins, golden retriever care, how long do budgies live)
+1. Show PocketPolly UI — ask questions (species lookup, care tips, diet advice, etc.)
 2. Show traces in LangSmith with online eval scores (`food_safety`, `scope_adherence`, etc.)
 3. Engine analyzes traces and identifies root causes across prompt and code
-4. Engine opens a PR on your fork
-5. GitHub Actions runs evals on the PR branch (fixed code) — scores pass ✅
-6. Show the experiments in LangSmith — before/after score comparison
+4. Add Engine-suggested dataset examples
+5. Engine opens a PR on your fork
+6. GitHub Actions runs evals on the PR branch (fixed code) — scores pass ✅
 7. Merge the PR
+8. Add Engine-suggested online eval
+9. Show the experiments in LangSmith — before/after score comparison
 
 ### After the demo
 
@@ -127,11 +128,11 @@ python -m scripts.cleanup
 
 | Script | What it does |
 |--------|-------------|
-| `python -m scripts.setup` | One-shot setup: creates dataset, runs "before" experiment, creates 5 online evaluators |
+| `python -m scripts.setup` | One-shot setup: creates dataset and creates 5 online evaluators |
 | `python -m scripts.generate_traces` | Runs 13 single-turn queries + 3 multi-turn threads through the buggy agent |
 | `python -m scripts.run_evals` | Runs offline evals against the dataset and prints scores |
 | `python -m scripts.run_evals --skip-dataset` | Re-runs evals against existing dataset (used in CI) |
-| `python -m scripts.run_evals --threshold 0.8` | Exits with code 1 if scores < 0.8 (used in CI) |
+| `python -m scripts.run_evals --threshold 0.7` | Exits with code 1 if scores < 0.7 (used in CI) |
 | `python -m scripts.cleanup` | Resets demo to clean state — see Cleanup section |
 | `streamlit run app.py` | Start the PocketPolly chat UI |
 
@@ -148,8 +149,6 @@ Online evaluators run automatically on every trace as it arrives in LangSmith �
 
 Five online evaluators are registered by `python -m scripts.setup`: `food_safety`, `scope_adherence`, `tool_usage`, `response_completeness`, and `factual_accuracy`. Once registered, LangSmith scores every new trace automatically and surfaces the results in the trace view.
 
-The evaluators use `{{output}}` (mustache format) mapped to `outputs["output"]` on each trace. The `@traceable` decorator on `invoke_agent` ensures every trace — including UI traces from the Streamlit app — has this output format.
-
 ## CI/CD
 
 `.github/workflows/evals.yml` runs automatically on every PR to `main`.
@@ -164,10 +163,10 @@ Add these secrets to your repo (Settings → Secrets → Actions):
 Run `python -m scripts.setup` locally first so the dataset exists for CI to run against. `DEMO_USER` and `LANGSMITH_PROJECT` must match what you used locally — that's how CI finds the right dataset.
 
 ```
-PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.8
+PR opened → GitHub Actions → run_evals --skip-dataset --threshold 0.7
                                           ↓
-                               scores < 0.8 → ❌ blocks merge
-                               scores ≥ 0.8 → ✅ mergeable
+                               scores < 0.7 → ❌ blocks merge
+                               scores ≥ 0.7 → ✅ mergeable
 ```
 
 CI runs against the PR branch code — so Engine's fix produces high scores, creating the "after" experiment in LangSmith automatically. Because `--skip-dataset` fetches the existing dataset from LangSmith by name, any examples Engine adds to the dataset are included in the eval run automatically.
@@ -185,7 +184,7 @@ evals/
 └── evaluators.py     # 2 LLM-as-judge offline evaluators (used in CI)
 
 scripts/
-├── setup.py          # one-shot setup: dataset + before experiment + online evaluators
+├── setup.py          # one-shot setup: dataset + online evaluators
 ├── generate_traces.py    # populate LangSmith with extra traces and threads
 ├── run_evals.py          # offline evals + CI threshold check
 └── cleanup.py            # resets demo to clean state after presentation
@@ -204,9 +203,10 @@ Run after the demo to reset everything for the next presenter:
 python -m scripts.cleanup
 ```
 
-This does three things:
-1. **Removes Engine-added dataset examples** — uses the `baseline` version tag (set by `setup.py`) to identify and delete only the examples Engine added, leaving the original 3 intact
-2. **Removes 'after' experiments** — deletes CI-created experiments while keeping the oldest one (the 'before' baseline from `setup.py`)
+This does four things:
+1. **Resets dataset to original 3 examples** — deletes all examples and re-uploads the canonical 3, removing anything Engine added
+2. **Deletes all experiments** — CI/CD generates fresh before/after experiments on every PR, so nothing needs to be preserved between demos
 3. **Removes Engine-added online evaluators** — uses saved run rule IDs from `.demo_state.json` to delete only evaluators Engine added, leaving the 5 from `setup.py` in place
+4. **Resets the fork's main branch to upstream** — force-resets to remove Engine's merged PR, restoring the buggy agent state
 
 After cleanup, the demo is ready to run again — no need to re-run `setup.py`.
