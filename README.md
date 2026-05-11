@@ -1,6 +1,6 @@
 # engine-demo-agent
 
-A parrot expert chatbot with intentional bugs, built to demonstrate LangSmith Engine's ability to identify issues in agent traces and propose fixes via PR. The agent answers questions about parrot care using three tools: species lookup, care tips, and diet advice.
+A parrot expert chatbot with intentional bugs, built to demonstrate LangSmith Engine's ability to identify issues in agent traces and propose fixes via PR. The agent answers questions about parrot care using three tools: `lookup_species`, `get_care_tips`, and `get_diet_advice`.
 
 ## What this demos
 
