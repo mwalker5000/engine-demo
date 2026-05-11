@@ -2,6 +2,7 @@
 
 import os
 from langsmith import Client
+from langsmith.schemas import DataType
 
 _demo_user = os.getenv("DEMO_USER", "").strip()
 DATASET_NAME = f"pocket-polly-demo-dataset-{_demo_user}" if _demo_user else "pocket-polly-demo-dataset"
@@ -47,7 +48,7 @@ def create_or_update_dataset() -> str:
         dataset = ls_client.create_dataset(
             dataset_name=DATASET_NAME,
             description="Parrot expert chatbot evaluation dataset — tests food safety, scope adherence, response completeness, and factual accuracy.",
-            data_type="kv",
+            data_type=DataType.kv,
         )
         print(f"Created dataset '{DATASET_NAME}' (ID: {dataset.id})")
 
