@@ -27,28 +27,49 @@ def _llm_judge(system_prompt: str, output: str) -> float:
     return 1.0 if answer.startswith("yes") else 0.0
 
 
-def tool_grounding_evaluator(run, example) -> dict:
-    """Did the agent call a tool or give a clean off-topic refusal?
+def tool_selection_evaluator(run, example) -> dict:
+    """Expert data labeler: did the agent select the right tools in the right order?
 
-    Reads tools_called from run.outputs — no LangSmith API calls needed.
-    Score: 1 = tools were called (grounded), or clean off-topic refusal
-           0 = answered a parrot question from memory without calling any tool
+    Score: 1 = accurate and efficient tool selection, or clean out-of-scope refusal with no tools
+           0 = parrot question answered without tools, wrong tools, unnecessary/redundant calls
     """
-    tools_called = (run.outputs or {}).get("tools_called", [])
-    if tools_called:
-        return {"key": "tool_grounding", "score": 1.0}
+    outputs = run.outputs or {}
+    question = (example.inputs or {}).get("question", "") if example else ""
+    trajectory = f"Question: {question}\n\nOutputs: {outputs}"
 
-    output = (run.outputs or {}).get("output") or ""
-    system_prompt = (
-        "You are evaluating a parrot care assistant response where no tool was called.\n\n"
-        "Score 'yes' ONLY if the ENTIRE response is a clean refusal — the agent declines to help "
-        "because the question is not about parrots AND does not go on to provide any advice "
-        "or tips for the non-parrot animal.\n"
-        "Score 'no' if:\n"
-        "  - The response answers a parrot question from memory (even if correct), OR\n"
-        "  - The response starts with a refusal but then provides advice for a non-parrot animal"
+    user_message = (
+        "You are an expert data labeler. Your task is to grade the accuracy of an AI agent's "
+        "tool selection during the resolution of a user query.\n\n"
+        "<Rubric>\n"
+        "Accurate tool selection:\n"
+        "- Uses the most appropriate tool for each step given the context\n"
+        "- Avoids unnecessary or redundant tool calls\n"
+        "- Uses tools in a logical order where dependencies exist\n"
+        "- Is semantically equivalent to the provided reference tool sequence, if present\n"
+        "</Rubric>\n\n"
+        "<Instructions>\n"
+        "1. Give a score of zero if no tools were called and a parrot-related question were asked. "
+        "If no tools were called and an out-of-scope question were asked, give a score of one.\n"
+        "2. Grade the following thread, evaluating whether the agent selected the right tools "
+        "in the right order to resolve the user's query efficiently.\n"
+        "3. Evaluate the choice of tools and whether any tools were unnecessary, missing, or "
+        "could have been replaced with a more appropriate alternative\n"
+        "</Instructions>\n\n"
+        "Please grade the following trajectory according to the above instructions:\n\n"
+        "<trajectory>\n"
+        f"{trajectory}\n"
+        "</trajectory>\n\n"
+        "Answer ONLY 'yes' (score 1) or 'no' (score 0)."
     )
-    return {"key": "tool_grounding", "score": _llm_judge(system_prompt, output)}
+    client = _get_anthropic_client()
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=16,
+        messages=[{"role": "user", "content": user_message}],
+    )
+    answer = response.content[0].text.strip().lower()
+    score = 1.0 if answer.startswith("yes") else 0.0
+    return {"key": "tool_selection", "score": score}
 
 
 def scope_adherence_evaluator(run, example) -> dict:
