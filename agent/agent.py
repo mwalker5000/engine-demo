@@ -1,8 +1,9 @@
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.prebuilt import ToolNode, tools_condition
+from langsmith import traceable
 
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOLS
@@ -32,21 +33,33 @@ def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     return RunnableConfig(
         metadata=metadata,
         tags=["engine-demo", "pocket-polly-agent"],
-        run_name="pocket-polly-demo",
     )
 
 
-def invoke_agent(question: str, extra_metadata: dict = None, **kwargs) -> str:
-    """Invoke the agent and return the full response string."""
+@traceable(name="pocket-polly-demo", run_type="chain", tags=["engine-demo", "pocket-polly-agent"])
+def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
+    """Invoke the agent and return the full conversation as messages plus a flat tools_called list.
+
+    The messages list (input, tool calls, tool results, final response) is stored
+    in run.outputs so the trace shows the complete trajectory.
+    tools_called is a flat list of tool names so evaluators can check it directly.
+    """
     agent = build_agent()
     result = agent.invoke(
         {"messages": [{"role": "user", "content": question}]},
         _make_config(extra_metadata),
     )
+    output = ""
     for msg in reversed(result["messages"]):
         if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content:
-            return msg.content
-    return ""
+            output = msg.content
+            break
+    tools_called = [msg.name for msg in result["messages"] if isinstance(msg, ToolMessage)]
+    return {
+        "output": output,
+        "messages": result["messages"],
+        "tools_called": tools_called,
+    }
 
 
 def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = None):
@@ -54,5 +67,5 @@ def stream_agent(question: str, extra_metadata: dict = None, thread_id: str = No
     kwargs = {}
     if thread_id:
         kwargs["langsmith_extra"] = {"metadata": {"thread_id": thread_id}}
-    response = invoke_agent(question, extra_metadata, **kwargs)
-    yield from response
+    result = invoke_agent(question, extra_metadata, **kwargs)
+    yield from result["output"]

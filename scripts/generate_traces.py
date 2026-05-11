@@ -70,10 +70,11 @@ def main():
         question = query["question"]
         print(f"[{i+1}/{len(QUERIES)}] {question[:70]}...")
         try:
-            response = invoke_agent(
+            result = invoke_agent(
                 question=question,
                 extra_metadata={"category": query["category"], "subcategory": query["subcategory"]},
             )
+            response = result["output"]
             print(f"  → {response[:100].replace(chr(10), ' ')}{'...' if len(response) > 100 else ''}\n")
         except Exception as e:
             print(f"  ERROR: {e}\n")
@@ -88,11 +89,12 @@ def main():
             question = turn["question"]
             print(f"  Turn {j+1}: {question[:65]}...")
             try:
-                response = invoke_agent(
+                result = invoke_agent(
                     question=question,
                     extra_metadata={"category": turn["category"], "subcategory": turn["subcategory"]},
                     langsmith_extra={"metadata": {"thread_id": thread_id}},
                 )
+                response = result["output"]
                 print(f"    → {response[:80].replace(chr(10), ' ')}{'...' if len(response) > 80 else ''}")
             except Exception as e:
                 print(f"    ERROR: {e}")

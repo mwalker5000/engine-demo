@@ -27,9 +27,9 @@ def run_agent_on_example(inputs: dict) -> dict:
     from agent.agent import invoke_agent
     question = (inputs.get("question") or "").strip()
     if not question:
-        return {"output": ""}
-    response = invoke_agent(question=question)
-    return {"output": response}
+        return {"output": "", "tools_called": []}
+    result = invoke_agent(question=question)
+    return {"output": result["output"], "tools_called": result.get("tools_called", [])}
 
 
 def run_evaluation(experiment_prefix: str) -> dict:

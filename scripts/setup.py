@@ -185,8 +185,9 @@ def run_initial_experiment() -> str | None:
     def run_agent(inputs: dict) -> dict:
         question = (inputs.get("question") or "").strip()
         if not question:
-            return {"output": ""}
-        return {"output": invoke_agent(question=question)}
+            return {"output": "", "tools_called": []}
+        result = invoke_agent(question=question)
+        return {"output": result["output"], "tools_called": result.get("tools_called", [])}
 
     evaluate(
         run_agent,

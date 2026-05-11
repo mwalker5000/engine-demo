@@ -1,7 +1,6 @@
 """Evaluators for the parrot expert demo."""
 
 from anthropic import Anthropic
-from langsmith import Client
 
 _anthropic_client = None
 
@@ -28,35 +27,17 @@ def _llm_judge(system_prompt: str, output: str) -> float:
     return 1.0 if answer.startswith("yes") else 0.0
 
 
-def _get_tool_runs(run):
-    """Fetch all tool-type runs in this trace.
-
-    Uses run.session_id (the experiment project) rather than LANGSMITH_PROJECT
-    because evaluate() stores runs in a temporary experiment project, not the
-    main tracing project.
-    """
-    try:
-        client = Client()
-        return list(client.list_runs(
-            project_id=str(run.session_id),
-            trace_id=str(run.id),
-            run_type="tool",
-        ))
-    except Exception:
-        return []
-
-
 def tool_grounding_evaluator(run, example) -> dict:
-    """LLM-as-judge: did the agent ground its response in tool output?
+    """Did the agent call a tool or give a clean off-topic refusal?
 
-    Score: 1 = agent called a tool (grounded by definition), or correctly declined off-topic question
-           0 = agent answered a parrot question from memory without calling any tool
+    Reads tools_called from run.outputs — no LangSmith API calls needed.
+    Score: 1 = tools were called (grounded), or clean off-topic refusal
+           0 = answered a parrot question from memory without calling any tool
     """
-    tool_runs = _get_tool_runs(run)
-    if tool_runs:
+    tools_called = (run.outputs or {}).get("tools_called", [])
+    if tools_called:
         return {"key": "tool_grounding", "score": 1.0}
 
-    # No tool called — check if it's a legitimate refusal (off-topic question)
     output = (run.outputs or {}).get("output") or ""
     system_prompt = (
         "You are evaluating a parrot care assistant response where no tool was called.\n\n"
