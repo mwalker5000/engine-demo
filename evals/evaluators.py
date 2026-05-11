@@ -39,16 +39,29 @@ def tool_grounding_evaluator(run, example) -> dict:
         return {"key": "tool_grounding", "score": 1.0}
 
     output = (run.outputs or {}).get("output") or ""
+    question = (example.inputs or {}).get("question", "") if example else ""
+    trajectory = f"Question: {question}\n\nAgent response: {output}"
     system_prompt = (
-        "You are evaluating a parrot care assistant response where no tool was called.\n\n"
-        "Score 'yes' ONLY if the ENTIRE response is a clean refusal — the agent declines to help "
-        "because the question is not about parrots AND does not go on to provide any advice "
-        "or tips for the non-parrot animal.\n"
-        "Score 'no' if:\n"
-        "  - The response answers a parrot question from memory (even if correct), OR\n"
-        "  - The response starts with a refusal but then provides advice for a non-parrot animal"
+        "You are an expert data labeler. Your task is to grade the accuracy of an AI agent's "
+        "tool selection during the resolution of a user query.\n\n"
+        "<Rubric>\n"
+        "Accurate tool selection:\n"
+        "- Uses the most appropriate tool for each step given the context\n"
+        "- Avoids unnecessary or redundant tool calls\n"
+        "- Uses tools in a logical order where dependencies exist\n"
+        "- Is semantically equivalent to the provided reference tool sequence, if present\n"
+        "</Rubric>\n\n"
+        "<Instructions>\n"
+        "1. Give a score of zero if no tools were called and a parrot-related question were asked. "
+        "If no tools were called and an out-of-scope question were asked, give a score of one.\n"
+        "2. Grade the following thread, evaluating whether the agent selected the right tools "
+        "in the right order to resolve the user's query efficiently.\n"
+        "3. Evaluate the choice of tools and whether any tools were unnecessary, missing, or "
+        "could have been replaced with a more appropriate alternative\n"
+        "</Instructions>\n\n"
+        "Please grade the following trajectory according to the above instructions:"
     )
-    return {"key": "tool_grounding", "score": _llm_judge(system_prompt, output)}
+    return {"key": "tool_grounding", "score": _llm_judge(system_prompt, trajectory)}
 
 
 def scope_adherence_evaluator(run, example) -> dict:
@@ -60,8 +73,7 @@ def scope_adherence_evaluator(run, example) -> dict:
     output = (run.outputs or {}).get("output") or ""
     system_prompt = (
         "You are evaluating whether a parrot care assistant stayed on topic.\n\n"
-        "Score 'yes' if the agent refused to answer questions about non-parrot animals "
-        "and stayed focused only on parrots. "
+        "Score 'yes' if the agent only answered parrot-related questions and stayed focused only on parrots. "
         "Score 'no' if the agent answered questions about dogs, cats, hamsters, or other non-parrot animals."
     )
     return {"key": "scope_adherence", "score": _llm_judge(system_prompt, output)}
