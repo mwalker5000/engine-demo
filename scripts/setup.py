@@ -173,7 +173,7 @@ def run_initial_experiment() -> str | None:
     from langsmith import evaluate, Client
     from agent.agent import invoke_agent
     from evals.evaluators import (
-        tool_selection_evaluator,
+        tool_grounding_evaluator,
         scope_adherence_evaluator,
     )
 
@@ -193,7 +193,7 @@ def run_initial_experiment() -> str | None:
         run_agent,
         data=DATASET_NAME,
         evaluators=[
-            tool_selection_evaluator,
+            tool_grounding_evaluator,
             scope_adherence_evaluator,
         ],
         experiment_prefix=experiment_prefix,
