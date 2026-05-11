@@ -2,12 +2,10 @@
 
 Run this once after cloning and configuring .env. It:
   1. Creates (or updates) the LangSmith evaluation dataset
-  2. Runs an initial experiment through the dataset to establish "before"
-     scores in LangSmith
-  3. Creates 5 online evaluators in the LangSmith Evaluators UI at 100%
+  2. Creates 5 online evaluators in the LangSmith Evaluators UI at 100%
      sampling rate so every future trace is automatically scored
 
-Evaluators (used for both offline dataset runs and online trace scoring):
+Evaluators (used for online trace scoring):
   food_safety           — agent avoids recommending toxic foods
   scope_adherence       — agent stays parrot-only
   tool_usage            — agent called at least one tool
@@ -15,7 +13,7 @@ Evaluators (used for both offline dataset runs and online trace scoring):
   factual_accuracy      — agent gave correct species/care info
 
 Usage:
-    python -m scripts.setup_online_evals
+    python -m scripts.setup
 """
 
 import json
@@ -103,7 +101,7 @@ def ensure_project_exists() -> None:
     The project is created automatically when the first trace lands there.
     """
     from agent.agent import invoke_agent
-    print(f"\n[0/4] Creating LangSmith project '{PROJECT_NAME}'...")
+    print(f"\n[0/3] Creating LangSmith project '{PROJECT_NAME}'...")
     invoke_agent("What vegetables are safe for parrots?")
     print(f"  Project '{PROJECT_NAME}' is ready.")
 
@@ -119,7 +117,7 @@ def setup_dataset() -> str:
     from evals.dataset import create_or_update_dataset
     from langsmith import Client
 
-    print(f"\n[1/4] Setting up dataset '{DATASET_NAME}'...")
+    print(f"\n[1/3] Setting up dataset '{DATASET_NAME}'...")
     create_or_update_dataset()
 
     ls_client = Client()
@@ -130,92 +128,6 @@ def setup_dataset() -> str:
     )
     print(f"  Tagged dataset version as 'baseline'.")
     return DATASET_NAME
-
-
-# ── Offline evaluators (used in dataset experiment runs) ──────────────────────
-
-def _make_offline_evaluator(ev: dict):
-    """Build a LangSmith-compatible offline evaluator function from an EVALUATORS entry."""
-    from anthropic import Anthropic
-
-    feedback_key = ev["feedback_key"]
-    system_prompt = ev["system_prompt"]
-
-    def evaluator(run, example) -> dict:
-        output = (run.outputs or {}).get("output", "")
-        client = Anthropic()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=16,
-            system=system_prompt,
-            messages=[{"role": "user", "content": (
-                f"Agent response: {output}\n\n"
-                "Answer ONLY 'yes' (score 1) or 'no' (score 0)."
-            )}],
-        )
-        answer = response.content[0].text.strip().lower()
-        score = 1.0 if answer.startswith("yes") else 0.0
-        return {"key": feedback_key, "score": score}
-
-    evaluator.__name__ = feedback_key
-    return evaluator
-
-
-def run_initial_experiment() -> str | None:
-    """Run the agent against the dataset to establish 'before' scores.
-
-    Uses the same evaluators as CI (run_evals.py) so the before/after
-    comparison in LangSmith shows the same keys.
-
-    Returns the experiment name so main() can save it to .demo_state.json
-    for cleanup to use.
-    """
-    from langsmith import evaluate, Client
-    from agent.agent import invoke_agent
-    from evals.evaluators import (
-        tool_grounding_evaluator,
-        scope_adherence_evaluator,
-    )
-
-    demo_user = _demo_user or "demo"
-    experiment_prefix = f"before-pocket-polly-demo-{demo_user}"
-    print(f"\n[2/4] Running initial experiment on dataset '{DATASET_NAME}'...")
-    print("      This creates the 'before' scores in LangSmith for Engine to compare against.\n")
-
-    def run_agent(inputs: dict) -> dict:
-        question = (inputs.get("question") or "").strip()
-        if not question:
-            return {"output": "", "tools_called": []}
-        result = invoke_agent(question=question)
-        return {"output": result["output"], "tools_called": result.get("tools_called", [])}
-
-    evaluate(
-        run_agent,
-        data=DATASET_NAME,
-        evaluators=[
-            tool_grounding_evaluator,
-            scope_adherence_evaluator,
-        ],
-        experiment_prefix=experiment_prefix,
-        metadata={"demo": "true", "demo_type": "pocket-polly", "demo_user": demo_user},
-    )
-
-    # Find the experiment name LangSmith assigned (prefix + timestamp)
-    ls_client = Client()
-    datasets = list(ls_client.list_datasets(dataset_name=DATASET_NAME))
-    if datasets:
-        experiments = list(ls_client.list_projects(reference_dataset_id=datasets[0].id))
-        our_exps = sorted(
-            [e for e in experiments if e.name.startswith(experiment_prefix)],
-            key=lambda e: e.start_time,
-            reverse=True,
-        )
-        if our_exps:
-            name = our_exps[0].name
-            print(f"\n  Experiment scores (before) — '{name}':")
-            return name
-
-    return None
 
 
 # ── Online evaluators ──────────────────────────────────────────────────────────
@@ -328,7 +240,7 @@ def setup_online_evaluators(api_key: str) -> list:
     from langsmith import Client
     from langchain_anthropic import ChatAnthropic
 
-    print(f"\n[3/4] Setting up online evaluators on project '{PROJECT_NAME}'...")
+    print(f"\n[2/3] Setting up online evaluators on project '{PROJECT_NAME}'...")
 
     ls_client = Client()
     project_id = get_project_id(ls_client, PROJECT_NAME)
@@ -359,20 +271,17 @@ def main():
 
     ensure_project_exists()
     setup_dataset()
-    setup_experiment_name = run_initial_experiment()
     our_rule_ids = setup_online_evaluators(api_key)
 
     # Save state so cleanup can distinguish setup resources from Engine-added ones
     with open(".demo_state.json", "w") as f:
         json.dump({
-            "setup_experiment_name": setup_experiment_name,
             "run_rule_ids": our_rule_ids,
         }, f, indent=2)
 
     print(f"\nSetup complete.")
     print(f"  Dataset:      {DATASET_NAME}")
     print(f"  Project:      {PROJECT_NAME}")
-    print(f"  Experiment:   {setup_experiment_name or '(see LangSmith)'}")
     print(f"  Online evals: scoring all new traces automatically")
 
 
