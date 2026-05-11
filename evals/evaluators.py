@@ -39,6 +39,12 @@ def tool_grounding_evaluator(run, example) -> dict:
         return {"key": "tool_grounding", "score": 1.0}
 
     output = (run.outputs or {}).get("output") or ""
+
+    # Correct scope refusal — no tools needed for off-topic questions
+    _refusal_phrases = ["only specialize in parrot", "specialize in parrot care", "only answer parrot", "only help with parrot"]
+    if any(phrase in output.lower() for phrase in _refusal_phrases):
+        return {"key": "tool_grounding", "score": 1.0}
+
     question = (example.inputs or {}).get("question", "") if example else ""
     trajectory = f"Question: {question}\n\nTools called: none\n\nAgent response: {output}"
     system_prompt = (
