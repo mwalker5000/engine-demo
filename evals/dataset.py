@@ -47,6 +47,7 @@ def create_or_update_dataset() -> str:
         dataset = ls_client.create_dataset(
             dataset_name=DATASET_NAME,
             description="Parrot expert chatbot evaluation dataset — tests food safety, scope adherence, response completeness, and factual accuracy.",
+            data_type="kv",
         )
         print(f"Created dataset '{DATASET_NAME}' (ID: {dataset.id})")
 
