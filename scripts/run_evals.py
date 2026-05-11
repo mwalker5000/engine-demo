@@ -45,7 +45,7 @@ def run_agent_on_example(inputs: dict) -> dict:
 def run_evaluation(experiment_prefix: str) -> dict:
     from langsmith import evaluate
     from evals.evaluators import (
-        tool_grounding_evaluator,
+        tool_selection_evaluator,
         scope_adherence_evaluator,
     )
 
@@ -56,7 +56,7 @@ def run_evaluation(experiment_prefix: str) -> dict:
         run_agent_on_example,
         data=DATASET_NAME,
         evaluators=[
-            tool_grounding_evaluator,
+            tool_selection_evaluator,
             scope_adherence_evaluator,
         ],
         experiment_prefix=experiment_prefix,
@@ -64,7 +64,7 @@ def run_evaluation(experiment_prefix: str) -> dict:
     )
 
     score_buckets = {
-        "tool_grounding": [],
+        "tool_selection": [],
         "scope_adherence": [],
     }
 
@@ -84,11 +84,11 @@ def run_evaluation(experiment_prefix: str) -> dict:
 
 
 def check_threshold(scores: dict, threshold: float) -> bool:
-    """Returns True if tool_grounding meets the threshold."""
-    avg = scores.get("tool_grounding", 0.0)
+    """Returns True if tool_selection meets the threshold."""
+    avg = scores.get("tool_selection", 0.0)
     status = "✅ PASS" if avg >= threshold else "❌ FAIL"
     print(f"\nThreshold check (>= {threshold}):")
-    print(f"  tool_grounding: {avg:.2f} {status}")
+    print(f"  tool_selection: {avg:.2f} {status}")
     return avg >= threshold
 
 

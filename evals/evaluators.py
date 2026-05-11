@@ -28,7 +28,7 @@ def _llm_judge(system_prompt: str, output: str) -> float:
     return 1.0 if answer.startswith("yes") else 0.0
 
 
-def tool_grounding_evaluator(run, example) -> dict:
+def tool_selection_evaluator(run, example) -> dict:
     """Did the agent call a tool or give a clean off-topic refusal?
 
     Score: 1 = tools were called, or question was not parrot-related (no tool needed)
@@ -52,7 +52,7 @@ def tool_grounding_evaluator(run, example) -> dict:
         messages=[{"role": "user", "content": trajectory + "\n\nAnswer ONLY 'yes' (score 1) or 'no' (score 0)."}],
     )
     answer = response.content[0].text.strip().lower()
-    return {"key": "tool_grounding", "score": 1.0 if answer.startswith("yes") else 0.0}
+    return {"key": "tool_selection", "score": 1.0 if answer.startswith("yes") else 0.0}
 
 
 def scope_adherence_evaluator(run, example) -> dict:

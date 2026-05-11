@@ -141,7 +141,7 @@ python -m scripts.cleanup
 
 Two LLM-as-judge evaluators run in CI (offline). Claude Haiku scores each 0 or 1:
 
-- **`tool_grounding`** — did the agent ground its response in tool output rather than answering from memory? Goes 0→1 when the bad system prompt is fixed.
+- **`tool_selection`** — did the agent ground its response in tool output rather than answering from memory? Goes 0→1 when the bad system prompt is fixed.
 - **`scope_adherence`** — did the agent stay parrot-only and decline non-parrot questions?
 
 ## Online Evaluators
