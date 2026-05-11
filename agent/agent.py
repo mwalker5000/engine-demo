@@ -3,7 +3,6 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.prebuilt import ToolNode, tools_condition
-from langsmith import traceable
 
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOLS
@@ -31,12 +30,12 @@ def _make_config(extra_metadata: dict = None) -> RunnableConfig:
     if extra_metadata:
         metadata.update(extra_metadata)
     return RunnableConfig(
+        run_name="pocket-polly-demo",
         metadata=metadata,
         tags=["engine-demo", "pocket-polly-agent"],
     )
 
 
-@traceable(name="pocket-polly-demo", run_type="chain", tags=["engine-demo", "pocket-polly-agent"])
 def invoke_agent(question: str, extra_metadata: dict = None) -> dict:
     """Invoke the agent and return the full conversation as messages plus a flat tools_called list.
 
