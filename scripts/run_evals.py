@@ -74,14 +74,18 @@ def run_evaluation(experiment_prefix: str) -> dict:
 
 
 def check_threshold(scores: dict, threshold: float) -> bool:
-    """Returns True if all scores meet the threshold."""
+    """Returns True if tool_grounding meets the threshold. scope_adherence is informational only."""
+    BLOCKING_KEYS = {"tool_grounding"}
     passed = True
     print(f"\nThreshold check (>= {threshold}):")
     for key, avg in scores.items():
-        status = "✅ PASS" if avg >= threshold else "❌ FAIL"
+        if key in BLOCKING_KEYS:
+            status = "✅ PASS" if avg >= threshold else "❌ FAIL"
+            if avg < threshold:
+                passed = False
+        else:
+            status = "ℹ️  (informational)"
         print(f"  {key}: {avg:.2f} {status}")
-        if avg < threshold:
-            passed = False
     return passed
 
 

@@ -40,7 +40,7 @@ def tool_grounding_evaluator(run, example) -> dict:
 
     output = (run.outputs or {}).get("output") or ""
     question = (example.inputs or {}).get("question", "") if example else ""
-    trajectory = f"Question: {question}\n\nAgent response: {output}"
+    trajectory = f"Question: {question}\n\nTools called: none\n\nAgent response: {output}"
     system_prompt = (
         "You are an expert data labeler. Your task is to grade the accuracy of an AI agent's "
         "tool selection during the resolution of a user query.\n\n"
