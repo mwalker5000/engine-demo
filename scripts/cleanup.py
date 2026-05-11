@@ -208,7 +208,7 @@ def reset_fork_to_upstream() -> None:
         ["gh", "api", f"repos/{fork_repo}/git/refs/heads/main",
          "-X", "PATCH",
          "-f", f"sha={upstream_sha}",
-         "-f", "force=true"],
+         "-F", "force=true"],
         capture_output=True, text=True,
     )
     if result.returncode == 0:
